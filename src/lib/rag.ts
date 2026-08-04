@@ -32,9 +32,9 @@ export function isSmallTalk(question: string): boolean {
 
   if (!q || q.length > 100) return false;
 
-  // Bilgi sorusu ipucu varsa small-talk sayma
+  // Bilgi sorusu ipucu varsa small-talk sayma (Türkçe'de \b güvenilmez)
   if (
-    /\b(iade|kargo|fiyat|stok|ürün|urun|profil|politika|sipariş|siparis|ödeme|odeme|kaç gün|kac gun|tl|mm|çerçeve|cerceve|bedava|ücretsiz|ucretsiz)\b/i.test(
+    /iade|kargo|fiyat|stok|ürün|urun|profil|politika|sipariş|siparis|ödeme|odeme|kaç\s*gün|kac\s*gun|\btl\b|\bmm\b|çerçeve|cerceve|bedava|ücretsiz|ucretsiz|pahalı|pahali|ucuz/i.test(
       q,
     )
   ) {

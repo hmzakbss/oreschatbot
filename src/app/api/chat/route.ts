@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { runAgentChat } from "@/lib/agent";
 import {
-  detectSourceTypeFilter,
-  embedQuery,
-  generateAnswer,
   generateSmallTalkReply,
   isSmallTalk,
-  matchDocuments,
   NO_INFO_REPLY,
   type AnswerResult,
 } from "@/lib/rag";
@@ -99,15 +96,9 @@ export async function POST(request: Request) {
     let answer: AnswerResult;
 
     if (isSmallTalk(message)) {
-      // RAG dışı: kaynak asla yok
       answer = await generateSmallTalkReply(message);
     } else {
-      const embedding = await embedQuery(message);
-      const filterSourceType = detectSourceTypeFilter(message);
-      const matches = await matchDocuments(supabase, embedding, {
-        filterSourceType,
-      });
-      answer = await generateAnswer(message, matches);
+      answer = await runAgentChat(supabase, message);
     }
 
     // Kaynak yalnızca mode === 'rag' iken
