@@ -103,6 +103,43 @@ export async function embedQuery(text: string): Promise<number[]> {
   return embedding;
 }
 
+/**
+ * Soru tipine göre documents.source_type filtresi.
+ * - Yalnızca ürün sinyali → "urun"
+ * - Yalnızca politika sinyali → "politika"
+ * - Karışık / belirsiz → null (filtre yok; yanlış kilitleme yapma)
+ */
+export function detectSourceTypeFilter(
+  question: string,
+): "urun" | "politika" | null {
+  const q = question
+    .toLocaleLowerCase("tr")
+    .replace(/[?!.,…]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!q) return null;
+
+  // Türkçe ekler için kelime sonu \b kullanma (çerçeveyi, stokta, ...)
+  const hasProduct =
+    /fiyat|stok|profil|çerçeve|cerceve|ürün|urun|sku|malzeme|boyut|ölçü|olcu|köşe|kose|renk|ağırlık|agirlik|indirim|afiş|afis|stand|pano|\bmm\b/i.test(
+      q,
+    ) ||
+    /\b(b[0-2]|a[0-4])\b/i.test(q) ||
+    /\b[a-z]{1,3}\d{2}\b/i.test(q); // kabaca SKU (örn. m01)
+
+  const hasPolicy =
+    /iade|kargo|gizlilik|çerez|cerez|politika|teslimat|değişim|degisim|hasarlı|hasarli|kusurlu|tahkim|şartlar|sartlar|sipariş|siparis|ödeme|odeme|havale|eft|iyzico|sms|kişisel\s*ver|kisisel\s*ver|iletişim|iletisim|çalışma\s*saat|calisma\s*saat|ücretsiz\s*kargo|ucretsiz\s*kargo/i.test(
+      q,
+    ) ||
+    /kaç\s*gün|kac\s*gun|\d+\s*iş\s*gün|\d+\s*is\s*gun/i.test(q);
+
+  if (hasProduct && hasPolicy) return null;
+  if (hasProduct) return "urun";
+  if (hasPolicy) return "politika";
+  return null;
+}
+
 export async function matchDocuments(
   supabase: SupabaseClient,
   queryEmbedding: number[],

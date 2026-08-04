@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
+  detectSourceTypeFilter,
   embedQuery,
   generateAnswer,
   generateSmallTalkReply,
@@ -102,7 +103,10 @@ export async function POST(request: Request) {
       answer = await generateSmallTalkReply(message);
     } else {
       const embedding = await embedQuery(message);
-      const matches = await matchDocuments(supabase, embedding);
+      const filterSourceType = detectSourceTypeFilter(message);
+      const matches = await matchDocuments(supabase, embedding, {
+        filterSourceType,
+      });
       answer = await generateAnswer(message, matches);
     }
 
