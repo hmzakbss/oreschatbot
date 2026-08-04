@@ -1,10 +1,11 @@
 -- ORES Chatbot — ores.txt zorunlu gereksinimlerine uygun şema
 -- Auth: Supabase auth.users | RAG: pgvector | Geçmiş: user_id | Kaynak: messages.sources
+-- Not: Idempotent — tablolar zaten varsa (manuel SQL / tekrar deploy) hata vermez.
 
 create extension if not exists vector with schema extensions;
 
 -- Bilgi tabanı (urunler.csv + politikalar.md, 28 ürün dahil)
-create table public.documents (
+create table if not exists public.documents (
   id uuid primary key default gen_random_uuid(),
   content text not null,
   embedding extensions.vector(1536),
@@ -16,13 +17,13 @@ create table public.documents (
   created_at timestamptz not null default now()
 );
 
-create index documents_source_type_idx on public.documents (source_type);
-create index documents_embedding_hnsw_idx
+create index if not exists documents_source_type_idx on public.documents (source_type);
+create index if not exists documents_embedding_hnsw_idx
   on public.documents
   using hnsw (embedding extensions.vector_cosine_ops);
 
 -- Kullanıcıya bağlı sohbet geçmişi
-create table public.conversations (
+create table if not exists public.conversations (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users (id) on delete cascade,
   title text,
@@ -30,9 +31,9 @@ create table public.conversations (
   updated_at timestamptz not null default now()
 );
 
-create index conversations_user_id_idx on public.conversations (user_id);
+create index if not exists conversations_user_id_idx on public.conversations (user_id);
 
-create table public.messages (
+create table if not exists public.messages (
   id uuid primary key default gen_random_uuid(),
   conversation_id uuid not null
     references public.conversations (id) on delete cascade,
@@ -43,19 +44,21 @@ create table public.messages (
   created_at timestamptz not null default now()
 );
 
-create index messages_conversation_id_idx on public.messages (conversation_id);
+create index if not exists messages_conversation_id_idx on public.messages (conversation_id);
 
 -- RLS
 alter table public.documents enable row level security;
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
 
+drop policy if exists "documents_select_authenticated" on public.documents;
 create policy "documents_select_authenticated"
   on public.documents
   for select
   to authenticated
   using (true);
 
+drop policy if exists "conversations_own_all" on public.conversations;
 create policy "conversations_own_all"
   on public.conversations
   for all
@@ -63,6 +66,7 @@ create policy "conversations_own_all"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
+drop policy if exists "messages_own_all" on public.messages;
 create policy "messages_own_all"
   on public.messages
   for all
