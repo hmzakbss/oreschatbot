@@ -10,6 +10,7 @@
     "ingest": "tsx scripts/ingest.ts"
   },
   "dependencies": {
+    "@supabase/ssr": "^0.12.4",
     "@supabase/supabase-js": "^2.112.0",
     "csv-parse": "^7.0.2",
     "dotenv": "^17.4.2",
