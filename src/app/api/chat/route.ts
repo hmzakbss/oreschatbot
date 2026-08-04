@@ -3,6 +3,8 @@ import { createClient } from "@/lib/supabase/server";
 import {
   embedQuery,
   generateAnswer,
+  generateSmallTalkReply,
+  isSmallTalk,
   matchDocuments,
   NO_INFO_REPLY,
   type ChatSource,
@@ -93,16 +95,22 @@ export async function POST(request: Request) {
       .eq("id", conversationId)
       .eq("user_id", user.id);
 
-    const embedding = await embedQuery(message);
-    const matches = await matchDocuments(supabase, embedding);
-    const answer = await generateAnswer(message, matches);
+    let answer: { content: string; sources: ChatSource[] };
 
-    // Model bilgi-yok cevabı verdiyse kaynakları gizle
-    const sources: ChatSource[] = answer.content.includes(
-      "elimde net bir bilgi yok",
-    )
-      ? []
-      : answer.sources;
+    if (isSmallTalk(message)) {
+      // Selamlama/sohbet: RAG yok, kaynak yok
+      answer = await generateSmallTalkReply(message);
+    } else {
+      const embedding = await embedQuery(message);
+      const matches = await matchDocuments(supabase, embedding);
+      answer = await generateAnswer(message, matches);
+    }
+
+    const sources: ChatSource[] =
+      answer.sources.length === 0 ||
+      answer.content.includes("elimde net bir bilgi yok")
+        ? []
+        : answer.sources;
 
     const { data: assistantMsg, error: assistantError } = await supabase
       .from("messages")

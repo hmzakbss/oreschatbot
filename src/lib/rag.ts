@@ -1,5 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { EMBEDDING_MODEL, getOpenAI } from "@/lib/openai";
+import { CHAT_MODEL, EMBEDDING_MODEL, getOpenAI } from "@/lib/openai";
 
 export const NO_INFO_REPLY =
   "Bu konuda elimde net bir bilgi yok, isterseniz sizi yetkili satış danışmanımıza yönlendirebilirim.";
@@ -19,7 +19,58 @@ export type ChatSource = {
   source_id: string;
   source_title: string;
   similarity: number;
+  urun_url?: string | null;
 };
+
+/** Selamlama / kısa sohbet — RAG ve kaynak göstermeden yanıtlanır */
+export function isSmallTalk(question: string): boolean {
+  const q = question
+    .toLocaleLowerCase("tr")
+    .replace(/[?!.,…]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!q || q.length > 80) return false;
+
+  const patterns = [
+    /^(merhaba|selam|selamlar|hey|hi|hello|günaydın|iyi günler|iyi akşamlar|iyi geceler)(\s|$)/,
+    /^(naber|ne haber|nasılsın|nasilsin|nasıl gidiyor|nasil gidiyor|iyi misin|iyi misiniz)(\s|$)/,
+    /^(teşekkürler|tesekkurler|teşekkür ederim|tesekkur ederim|sağ ol|sag ol|sağol|sagol|thanks|thank you)(\s|$)/,
+    /^(görüşürüz|gorusuruz|hoşça kal|hosca kal|bye|güle güle|gule gule)(\s|$)/,
+    /^(kimsin|sen kimsin|ne yapabilirsin|ne yapıyorsun|ne yapiyorsun)(\s|$)/,
+  ];
+
+  return patterns.some((re) => re.test(q));
+}
+
+export async function generateSmallTalkReply(
+  question: string,
+): Promise<{ content: string; sources: ChatSource[] }> {
+  const openai = getOpenAI();
+  const completion = await openai.chat.completions.create({
+    model: CHAT_MODEL,
+    temperature: 0.4,
+    messages: [
+      {
+        role: "system",
+        content: `Sen ORES Mağaza müşteri asistanısın. Kullanıcı kısa bir selamlama veya sohbet sorusu sordu.
+
+Kurallar:
+- Nazik, kısa Türkçe cevap ver (1-2 cümle).
+- Ürün, fiyat, stok, kargo, iade gibi mağaza bilgisi uydurma.
+- Kendini ORES asistanı olarak tanıtabilir; ürün/politika sorularında yardımcı olabileceğini söyle.
+- Kaynak uydurma; bilgi tabanı iddiası yapma.`,
+      },
+      { role: "user", content: question },
+    ],
+  });
+
+  const content =
+    completion.choices[0]?.message?.content?.trim() ||
+    "Merhaba! ORES Mağaza asistanıyım. Ürün veya politikalar hakkında sorabilirsiniz.";
+
+  return { content, sources: [] };
+}
 
 export async function embedQuery(text: string): Promise<number[]> {
   const openai = getOpenAI();
@@ -51,7 +102,8 @@ export async function matchDocuments(
     filter_source_type: options?.filterSourceType ?? null,
     filter_category: options?.filterCategory ?? null,
     filter_max_price: options?.filterMaxPrice ?? null,
-    match_threshold: options?.matchThreshold ?? 0.25,
+    // 0.25 kısa/gürültülü eşleşmeleri fazla geçiriyordu
+    match_threshold: options?.matchThreshold ?? 0.35,
   });
 
   if (error) {
@@ -62,12 +114,16 @@ export async function matchDocuments(
 }
 
 export function toSources(matches: MatchedDocument[]): ChatSource[] {
-  return matches.map((m) => ({
-    source_type: m.source_type,
-    source_id: m.source_id,
-    source_title: m.source_title,
-    similarity: Number(m.similarity.toFixed(4)),
-  }));
+  return matches.map((m) => {
+    const url = m.metadata?.urun_url;
+    return {
+      source_type: m.source_type,
+      source_id: m.source_id,
+      source_title: m.source_title,
+      similarity: Number(m.similarity.toFixed(4)),
+      urun_url: typeof url === "string" ? url : null,
+    };
+  });
 }
 
 export function buildContext(matches: MatchedDocument[]): string {
@@ -89,10 +145,9 @@ export async function generateAnswer(
 
   const openai = getOpenAI();
   const context = buildContext(matches);
-  const chatModel = process.env.OPENAI_CHAT_MODEL ?? "gpt-4o-mini";
 
   const completion = await openai.chat.completions.create({
-    model: chatModel,
+    model: CHAT_MODEL,
     temperature: 0.2,
     messages: [
       {
@@ -116,8 +171,7 @@ Kurallar:
   const content =
     completion.choices[0]?.message?.content?.trim() || NO_INFO_REPLY;
 
-  // Model yine de uydurursa / boş dönerse güvence
-  if (!content) {
+  if (!content || content.includes("elimde net bir bilgi yok")) {
     return { content: NO_INFO_REPLY, sources: [] };
   }
 
