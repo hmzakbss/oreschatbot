@@ -7,7 +7,7 @@ import {
   isSmallTalk,
   matchDocuments,
   NO_INFO_REPLY,
-  type ChatSource,
+  type AnswerResult,
 } from "@/lib/rag";
 
 type ChatRequestBody = {
@@ -95,10 +95,10 @@ export async function POST(request: Request) {
       .eq("id", conversationId)
       .eq("user_id", user.id);
 
-    let answer: { content: string; sources: ChatSource[] };
+    let answer: AnswerResult;
 
     if (isSmallTalk(message)) {
-      // Selamlama/sohbet: RAG yok, kaynak yok
+      // RAG dışı: kaynak asla yok
       answer = await generateSmallTalkReply(message);
     } else {
       const embedding = await embedQuery(message);
@@ -106,11 +106,8 @@ export async function POST(request: Request) {
       answer = await generateAnswer(message, matches);
     }
 
-    const sources: ChatSource[] =
-      answer.sources.length === 0 ||
-      answer.content.includes("elimde net bir bilgi yok")
-        ? []
-        : answer.sources;
+    // Kaynak yalnızca mode === 'rag' iken
+    const sources = answer.mode === "rag" ? answer.sources : [];
 
     const { data: assistantMsg, error: assistantError } = await supabase
       .from("messages")

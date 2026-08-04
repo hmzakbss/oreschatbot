@@ -30,22 +30,40 @@ export function isSmallTalk(question: string): boolean {
     .replace(/\s+/g, " ")
     .trim();
 
-  if (!q || q.length > 80) return false;
+  if (!q || q.length > 100) return false;
+
+  // Bilgi sorusu ipucu varsa small-talk sayma
+  if (
+    /\b(iade|kargo|fiyat|stok|ürün|urun|profil|politika|sipariş|siparis|ödeme|odeme|kaç gün|kac gun|tl|mm|çerçeve|cerceve|bedava|ücretsiz|ucretsiz)\b/i.test(
+      q,
+    )
+  ) {
+    return false;
+  }
 
   const patterns = [
-    /^(merhaba|selam|selamlar|hey|hi|hello|günaydın|iyi günler|iyi akşamlar|iyi geceler)(\s|$)/,
-    /^(naber|ne haber|nasılsın|nasilsin|nasıl gidiyor|nasil gidiyor|iyi misin|iyi misiniz)(\s|$)/,
-    /^(teşekkürler|tesekkurler|teşekkür ederim|tesekkur ederim|sağ ol|sag ol|sağol|sagol|thanks|thank you)(\s|$)/,
-    /^(görüşürüz|gorusuruz|hoşça kal|hosca kal|bye|güle güle|gule gule)(\s|$)/,
-    /^(kimsin|sen kimsin|ne yapabilirsin|ne yapıyorsun|ne yapiyorsun)(\s|$)/,
+    /^(merhaba|selam|selamlar|hey|hi|hello|günaydın|gunaydin|iyi günler|iyi gunler|iyi akşamlar|iyi aksamlar|iyi geceler)\b/,
+    /^(naber|ne haber|nasılsın|nasilsin|nasıl gidiyor|nasil gidiyor|iyi misin|iyi misiniz)\b/,
+    /^(iyiyim|çok iyiyim|cok iyiyim|iyi|süper|super|harika|idare eder|fena değil|fena degil)\b/,
+    /\b(teşekkürler|tesekkurler|teşekkür|tesekkur|teşekkür ederim|tesekkur ederim|sağ ol|sag ol|sağol|sagol|thanks|thank you)\b/,
+    /^(görüşürüz|gorusuruz|hoşça kal|hosca kal|bye|güle güle|gule gule)\b/,
+    /^(kimsin|sen kimsin|ne yapabilirsin|ne yapıyorsun|ne yapiyorsun)\b/,
+    /^(evet|hayır|hayir|ok|okay|tamam|anladım|anladim|peki)\b/,
   ];
 
   return patterns.some((re) => re.test(q));
 }
 
+export type AnswerResult = {
+  content: string;
+  sources: ChatSource[];
+  /** Yalnızca 'rag' iken kaynak gösterilir */
+  mode: "rag" | "small_talk" | "no_info";
+};
+
 export async function generateSmallTalkReply(
   question: string,
-): Promise<{ content: string; sources: ChatSource[] }> {
+): Promise<AnswerResult> {
   const openai = getOpenAI();
   const completion = await openai.chat.completions.create({
     model: CHAT_MODEL,
@@ -69,7 +87,7 @@ Kurallar:
     completion.choices[0]?.message?.content?.trim() ||
     "Merhaba! ORES Mağaza asistanıyım. Ürün veya politikalar hakkında sorabilirsiniz.";
 
-  return { content, sources: [] };
+  return { content, sources: [], mode: "small_talk" };
 }
 
 export async function embedQuery(text: string): Promise<number[]> {
@@ -138,9 +156,9 @@ export function buildContext(matches: MatchedDocument[]): string {
 export async function generateAnswer(
   question: string,
   matches: MatchedDocument[],
-): Promise<{ content: string; sources: ChatSource[] }> {
+): Promise<AnswerResult> {
   if (matches.length === 0) {
-    return { content: NO_INFO_REPLY, sources: [] };
+    return { content: NO_INFO_REPLY, sources: [], mode: "no_info" };
   }
 
   const openai = getOpenAI();
@@ -172,8 +190,9 @@ Kurallar:
     completion.choices[0]?.message?.content?.trim() || NO_INFO_REPLY;
 
   if (!content || content.includes("elimde net bir bilgi yok")) {
-    return { content: NO_INFO_REPLY, sources: [] };
+    return { content: NO_INFO_REPLY, sources: [], mode: "no_info" };
   }
 
-  return { content, sources: toSources(matches) };
+  // Kaynak yalnızca RAG ile üretilen başarılı cevaplarda
+  return { content, sources: toSources(matches), mode: "rag" };
 }
