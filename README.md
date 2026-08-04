@@ -62,4 +62,4 @@ Tarayıcı: http://localhost:3000
 
 ## Çalışma günlüğü
 
-Ayrı dosya olarak eklenecek: `CALISMA_GUNLUGU.md` (D2).
+Bkz. [`CALISMA_GUNLUGU.md`](./CALISMA_GUNLUGU.md)
