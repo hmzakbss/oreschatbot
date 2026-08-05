@@ -6,17 +6,21 @@ import {
   detectMaxPriceFilter,
   detectSourceTypeFilter,
   embedQuery,
+  filterUsedSources,
   generateAnswer,
+  generateAnswerStream,
   generateSmallTalkReply,
   isSmallTalk,
   matchDocuments,
   NO_INFO_REPLY,
+  toSources,
   type AnswerResult,
 } from "@/lib/rag";
 
 type ChatRequestBody = {
   message?: string;
   conversationId?: string | null;
+  stream?: boolean;
 };
 
 function makeTitle(message: string): string {
@@ -112,10 +116,188 @@ export async function POST(request: Request) {
       content: string;
     }[];
 
+    if (body.stream) {
+      const encoder = new TextEncoder();
+
+      if (isSmallTalk(message)) {
+        const smallTalk = await generateSmallTalkReply(message);
+        const stream = new ReadableStream({
+          async start(controller) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "metadata",
+                  conversationId,
+                  sources: [],
+                })}\n\n`,
+              ),
+            );
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "token",
+                  content: smallTalk.content,
+                })}\n\n`,
+              ),
+            );
+
+            await supabase.from("messages").insert({
+              conversation_id: conversationId,
+              user_id: user.id,
+              role: "assistant",
+              content: smallTalk.content,
+              sources: [],
+            });
+
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`),
+            );
+            controller.close();
+          },
+        });
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+          },
+        });
+      }
+
+      const standaloneQuery = await contextualizeQuery(message, history);
+      const embedding = await embedQuery(standaloneQuery);
+      const filterSourceType = detectSourceTypeFilter(standaloneQuery);
+      const filterMaxPrice = detectMaxPriceFilter(standaloneQuery);
+      const filterCategory = detectCategoryFilter(standaloneQuery);
+      const matches = await matchDocuments(supabase, embedding, {
+        filterSourceType,
+        filterMaxPrice,
+        filterCategory,
+      });
+
+      const { stream: openaiStream } = await generateAnswerStream(
+        message,
+        matches,
+      );
+
+      if (!openaiStream) {
+        const stream = new ReadableStream({
+          async start(controller) {
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "metadata",
+                  conversationId,
+                  sources: [],
+                })}\n\n`,
+              ),
+            );
+            controller.enqueue(
+              encoder.encode(
+                `data: ${JSON.stringify({
+                  type: "token",
+                  content: NO_INFO_REPLY,
+                })}\n\n`,
+              ),
+            );
+
+            await supabase.from("messages").insert({
+              conversation_id: conversationId,
+              user_id: user.id,
+              role: "assistant",
+              content: NO_INFO_REPLY,
+              sources: [],
+            });
+
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`),
+            );
+            controller.close();
+          },
+        });
+
+        return new Response(stream, {
+          headers: {
+            "Content-Type": "text/event-stream",
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+          },
+        });
+      }
+
+      const stream = new ReadableStream({
+        async start(controller) {
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "metadata",
+                conversationId,
+                sources: [],
+              })}\n\n`,
+            ),
+          );
+
+          let fullText = "";
+          for await (const chunk of openaiStream) {
+            const token = chunk.choices[0]?.delta?.content || "";
+            if (token) {
+              fullText += token;
+              controller.enqueue(
+                encoder.encode(
+                  `data: ${JSON.stringify({
+                    type: "token",
+                    content: token,
+                  })}\n\n`,
+                ),
+              );
+            }
+          }
+
+          const isNoInfo =
+            !fullText || fullText.includes("elimde net bir bilgi yok");
+          const finalContent = isNoInfo ? NO_INFO_REPLY : fullText;
+          const usedMatches = isNoInfo
+            ? []
+            : filterUsedSources(matches, finalContent);
+          const finalSources = toSources(usedMatches);
+
+          controller.enqueue(
+            encoder.encode(
+              `data: ${JSON.stringify({
+                type: "sources",
+                sources: finalSources,
+              })}\n\n`,
+            ),
+          );
+
+          await supabase.from("messages").insert({
+            conversation_id: conversationId,
+            user_id: user.id,
+            role: "assistant",
+            content: finalContent,
+            sources: finalSources,
+          });
+
+          controller.enqueue(
+            encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`),
+          );
+          controller.close();
+        },
+      });
+
+      return new Response(stream, {
+        headers: {
+          "Content-Type": "text/event-stream",
+          "Cache-Control": "no-cache",
+          "Connection": "keep-alive",
+        },
+      });
+    }
+
     let answer: AnswerResult;
 
     if (isSmallTalk(message)) {
-      // RAG dışı: kaynak asla yok
       answer = await generateSmallTalkReply(message);
     } else {
       const standaloneQuery = await contextualizeQuery(message, history);
@@ -131,7 +313,6 @@ export async function POST(request: Request) {
       answer = await generateAnswer(message, matches);
     }
 
-    // Kaynak yalnızca mode === 'rag' iken
     const sources = answer.mode === "rag" ? answer.sources : [];
 
     const { data: assistantMsg, error: assistantError } = await supabase

@@ -110,6 +110,8 @@ export function ChatShell({
     setError(null);
 
     const tempUserId = `temp-user-${Date.now()}`;
+    const tempAssistantId = `temp-assistant-${Date.now()}`;
+
     setMessages((prev) => [
       ...prev,
       {
@@ -127,39 +129,91 @@ export function ChatShell({
         body: JSON.stringify({
           message: text,
           conversationId: activeId,
+          stream: true,
         }),
       });
 
-      const data = await res.json();
       if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
         throw new Error(data.error || "Mesaj gönderilemedi");
       }
 
-      const conversationId = data.conversationId as string;
-      const assistant = data.message as {
-        id: string;
-        role: "assistant";
-        content: string;
-        sources: ChatSource[];
-        created_at?: string;
-      };
+      if (!res.body) {
+        throw new Error("Yanıt akışı alınamadı");
+      }
 
-      setActiveId(conversationId);
       setMessages((prev) => [
         ...prev,
         {
-          id: assistant.id,
+          id: tempAssistantId,
           role: "assistant",
-          content: assistant.content,
-          sources: normalizeSources(assistant.sources),
-          created_at: assistant.created_at,
+          content: "",
+          sources: [],
         },
       ]);
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder("utf-8");
+      let streamBuffer = "";
+      let accumulatedContent = "";
+      let currentSources: ChatSource[] = [];
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        streamBuffer += decoder.decode(value, { stream: true });
+        const lines = streamBuffer.split("\n\n");
+        streamBuffer = lines.pop() || "";
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (trimmed.startsWith("data: ")) {
+            try {
+              const event = JSON.parse(trimmed.slice(6));
+              if (event.type === "metadata") {
+                if (event.conversationId) {
+                  setActiveId(event.conversationId);
+                }
+              } else if (event.type === "token") {
+                accumulatedContent += event.content;
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === tempAssistantId
+                      ? {
+                          ...m,
+                          content: accumulatedContent,
+                          sources: currentSources,
+                        }
+                      : m,
+                  ),
+                );
+              } else if (event.type === "sources") {
+                currentSources = normalizeSources(event.sources);
+                setMessages((prev) =>
+                  prev.map((m) =>
+                    m.id === tempAssistantId
+                      ? {
+                          ...m,
+                          sources: currentSources,
+                        }
+                      : m,
+                  ),
+                );
+              }
+            } catch {
+              // Ignore line parse errors
+            }
+          }
+        }
+      }
 
       await refreshConversations();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Mesaj gönderilemedi");
-      setMessages((prev) => prev.filter((m) => m.id !== tempUserId));
+      setMessages((prev) =>
+        prev.filter((m) => m.id !== tempUserId && m.id !== tempAssistantId),
+      );
     } finally {
       setSending(false);
     }

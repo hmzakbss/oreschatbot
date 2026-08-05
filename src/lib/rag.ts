@@ -339,3 +339,48 @@ Kurallar:
   const usedMatches = filterUsedSources(matches, content);
   return { content, sources: toSources(usedMatches), mode: "rag" };
 }
+
+export async function generateAnswerStream(
+  question: string,
+  matches: MatchedDocument[],
+) {
+  if (matches.length === 0) {
+    return {
+      stream: null,
+      matches: [],
+      mode: "no_info" as const,
+    };
+  }
+
+  const openai = getOpenAI();
+  const context = buildContext(matches);
+
+  const stream = await openai.chat.completions.create({
+    model: CHAT_MODEL,
+    temperature: 0.2,
+    stream: true,
+    messages: [
+      {
+        role: "system",
+        content: `Sen ORES Mağaza müşteri asistanısın. Yalnızca aşağıda verilen KAYNAK metinlerine dayanarak Türkçe cevap ver.
+
+Kurallar:
+- Kaynaklarda olmayan bilgiyi uydurma.
+- Emin değilsen veya kaynaklar soruyu karşılamıyorsa aynen şu cümleyi yaz: "${NO_INFO_REPLY}"
+- Fiyat, stok, profil kalınlığı, iade, kargo gibi iddiaları yalnızca kaynaklardan al.
+- Kısa ve net cevap ver.
+- Kaynak numaralarını cevabın içinde yazma; kaynaklar ayrıca gösterilecek.`,
+      },
+      {
+        role: "user",
+        content: `KAYNAKLAR:\n${context}\n\nSORU:\n${question}`,
+      },
+    ],
+  });
+
+  return {
+    stream,
+    matches,
+    mode: "rag" as const,
+  };
+}
