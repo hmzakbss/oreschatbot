@@ -10,4 +10,8 @@
 8. Vercel env’lerini Production+Preview’a ekledim; Site URL’yi supabase Auth’ta oreschatbot.vercel.app yaptım.
 9. Öğrendiklerim: kısa sorgularda vektör arama gürültülü olabiliyor; intent ayrımı + threshold RAG kalitesini ciddi etkiler.
 10.Öğrendiklerim: RLS + service_role ayrımı ve .env’nin repoya girmemesi güvenlik puanında temel hijyen.
-11.Sonraki adımlar: demo kullanıcıyı README’ye yazmak, sohbet UI ve RAG iyileştirmek.
+11. Node.js 20 ortamı için Ingest betiğine WebSocket polifili eklenerek Supabase pgvector indekslemesi sıfır hatayla çalıştırıldı (100 doküman).
+12. 10 örnek sorudan oluşan otomatik doğruluk benchmark betiği (`scripts/eval.ts`) yazıldı ve %100 doğruluk (10/10) elde edildi.
+13. RAG motorunun bilgi tabanında bulunmayan sorularda uydurma yapmayıp canlı satış danışmanına yönlendirme davranışı ve kaynak gösterimi doğrulandı.
+14. Production build (`npm run build`) derlemesi başarıyla tamamlandı.
+
