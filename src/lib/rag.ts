@@ -140,6 +140,14 @@ export function detectSourceTypeFilter(
   return null;
 }
 
+export function detectCategoryFilter(question: string): string | null {
+  const q = question.toLocaleLowerCase("tr");
+  if (/afiş\s*çerçevesi|afis\s*cercevesi|çerçeve|cerceve/i.test(q)) {
+    return "Afiş Çerçevesi";
+  }
+  return null;
+}
+
 export function detectMaxPriceFilter(question: string): number | null {
   const q = question.toLocaleLowerCase("tr");
   if (/kargo|iade|teslimat|sepet|sipariş|siparis/i.test(q)) {
@@ -155,6 +163,59 @@ export function detectMaxPriceFilter(question: string): number | null {
     }
   }
   return null;
+}
+
+export type PreviousMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
+/**
+ * Kullanıcının sohbet geçmişini analiz eder ve takipli kısaltılmış soruları
+ * bağımsız arama sorgusuna dönüştürür.
+ */
+export async function contextualizeQuery(
+  question: string,
+  history: PreviousMessage[],
+): Promise<string> {
+  if (!history || history.length === 0) {
+    return question;
+  }
+
+  const openai = getOpenAI();
+  const historyText = history
+    .slice(-4)
+    .map((m) => `${m.role === "user" ? "Kullanıcı" : "Asistan"}: ${m.content}`)
+    .join("\n");
+
+  try {
+    const completion = await openai.chat.completions.create({
+      model: CHAT_MODEL,
+      temperature: 0.0,
+      messages: [
+        {
+          role: "system",
+          content: `Sana bir sohbet geçmişi ve kullanıcının son sorusu verilecek.
+Görevin: Sohbet geçmişine dayanarak, kullanıcının son sorusunu TEK BAŞINA ANLAŞILIR VE ARANABİLİR net bir arama cümlesine dönüştürmektir.
+
+KURALLAR:
+- Soruyu yanıtlama, sadece soruyu net arama ifadesine dönüştür.
+- Kullanıcının sorusu zaten tek başına netse, olduğu gibi bırak.
+- Yanıt olarak SADECE dönüştürülmüş net arama cümlesini yaz. Başka hiçbir açıklama ekleme.`,
+        },
+        {
+          role: "user",
+          content: `SOHBET GEÇMİŞİ:\n${historyText}\n\nSON SORU:\n${question}`,
+        },
+      ],
+    });
+
+    const rewritten = completion.choices[0]?.message?.content?.trim();
+    return rewritten || question;
+  } catch (err) {
+    console.error("contextualizeQuery hatası:", err);
+    return question;
+  }
 }
 
 export async function matchDocuments(
@@ -185,6 +246,32 @@ export async function matchDocuments(
   }
 
   return (data ?? []) as MatchedDocument[];
+}
+
+export function filterUsedSources(
+  matches: MatchedDocument[],
+  answerContent: string,
+): MatchedDocument[] {
+  const contentLower = answerContent.toLocaleLowerCase("tr");
+
+  const used = matches.filter((m) => {
+    const titleLower = m.source_title.toLocaleLowerCase("tr");
+    const idLower = m.source_id.toLocaleLowerCase("tr");
+
+    if (idLower.length > 2 && contentLower.includes(idLower)) return true;
+    if (titleLower.length > 2 && contentLower.includes(titleLower)) return true;
+
+    const cleanTitle = titleLower.replace(/[^a-z0-9çğıöşü\s]/gi, " ");
+    const words = cleanTitle.split(/\s+/).filter((w) => w.length > 3);
+    if (words.length >= 2) {
+      const firstTwo = words.slice(0, 2).join(" ");
+      if (contentLower.includes(firstTwo)) return true;
+    }
+
+    return false;
+  });
+
+  return used.length > 0 ? used : matches.slice(0, 2);
 }
 
 export function toSources(matches: MatchedDocument[]): ChatSource[] {
@@ -249,6 +336,6 @@ Kurallar:
     return { content: NO_INFO_REPLY, sources: [], mode: "no_info" };
   }
 
-  // Kaynak yalnızca RAG ile üretilen başarılı cevaplarda
-  return { content, sources: toSources(matches), mode: "rag" };
+  const usedMatches = filterUsedSources(matches, content);
+  return { content, sources: toSources(usedMatches), mode: "rag" };
 }

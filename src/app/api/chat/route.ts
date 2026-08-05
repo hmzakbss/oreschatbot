@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import {
+  contextualizeQuery,
+  detectCategoryFilter,
   detectMaxPriceFilter,
   detectSourceTypeFilter,
   embedQuery,
@@ -97,18 +99,34 @@ export async function POST(request: Request) {
       .eq("id", conversationId)
       .eq("user_id", user.id);
 
+    // Sohbet geçmişini çek (Takipli sorular ve Query Rewriting için)
+    const { data: pastMessages } = await supabase
+      .from("messages")
+      .select("role, content")
+      .eq("conversation_id", conversationId)
+      .order("created_at", { ascending: true })
+      .limit(6);
+
+    const history = (pastMessages ?? []).slice(0, -1) as {
+      role: "user" | "assistant";
+      content: string;
+    }[];
+
     let answer: AnswerResult;
 
     if (isSmallTalk(message)) {
       // RAG dışı: kaynak asla yok
       answer = await generateSmallTalkReply(message);
     } else {
-      const embedding = await embedQuery(message);
-      const filterSourceType = detectSourceTypeFilter(message);
-      const filterMaxPrice = detectMaxPriceFilter(message);
+      const standaloneQuery = await contextualizeQuery(message, history);
+      const embedding = await embedQuery(standaloneQuery);
+      const filterSourceType = detectSourceTypeFilter(standaloneQuery);
+      const filterMaxPrice = detectMaxPriceFilter(standaloneQuery);
+      const filterCategory = detectCategoryFilter(standaloneQuery);
       const matches = await matchDocuments(supabase, embedding, {
         filterSourceType,
         filterMaxPrice,
+        filterCategory,
       });
       answer = await generateAnswer(message, matches);
     }
