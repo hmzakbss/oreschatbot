@@ -140,6 +140,23 @@ export function detectSourceTypeFilter(
   return null;
 }
 
+export function detectMaxPriceFilter(question: string): number | null {
+  const q = question.toLocaleLowerCase("tr");
+  if (/kargo|iade|teslimat|sepet|sipariş|siparis/i.test(q)) {
+    return null;
+  }
+  const match = q.match(
+    /(\d+)\s*(?:tl|lira)?\s*(?:altı|altında|altındaki|den ucuz|den az|den küçük|küçük|kadar|ve altı)/i,
+  );
+  if (match && match[1]) {
+    const val = Number(match[1]);
+    if (!Number.isNaN(val) && val > 0) {
+      return val;
+    }
+  }
+  return null;
+}
+
 export async function matchDocuments(
   supabase: SupabaseClient,
   queryEmbedding: number[],
@@ -151,14 +168,16 @@ export async function matchDocuments(
     filterMaxPrice?: number | null;
   },
 ): Promise<MatchedDocument[]> {
+  const threshold =
+    options?.matchThreshold ?? (options?.filterMaxPrice ? 0.1 : 0.35);
+
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: queryEmbedding,
     match_count: options?.matchCount ?? 6,
     filter_source_type: options?.filterSourceType ?? null,
     filter_category: options?.filterCategory ?? null,
     filter_max_price: options?.filterMaxPrice ?? null,
-    // 0.25 kısa/gürültülü eşleşmeleri fazla geçiriyordu
-    match_threshold: options?.matchThreshold ?? 0.35,
+    match_threshold: threshold,
   });
 
   if (error) {

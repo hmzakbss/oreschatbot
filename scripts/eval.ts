@@ -3,6 +3,7 @@ import { config as loadEnv } from "dotenv";
 import { createClient } from "@supabase/supabase-js";
 import WebSocket from "ws";
 import {
+  detectMaxPriceFilter,
   detectSourceTypeFilter,
   embedQuery,
   generateAnswer,
@@ -108,7 +109,11 @@ async function runEvaluation() {
 
     const embedding = await embedQuery(test.question);
     const filterSourceType = detectSourceTypeFilter(test.question);
-    const matches = await matchDocuments(supabase, embedding, { filterSourceType });
+    const filterMaxPrice = detectMaxPriceFilter(test.question);
+    const matches = await matchDocuments(supabase, embedding, {
+      filterSourceType,
+      filterMaxPrice,
+    });
     const answer = await generateAnswer(test.question, matches);
 
     const isNoInfo = answer.mode === "no_info" || answer.content.includes("elimde net bir bilgi yok");
