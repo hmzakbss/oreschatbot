@@ -1,4 +1,5 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { ChatCompletionTool } from "openai/resources/chat/completions";
 import { CHAT_MODEL, EMBEDDING_MODEL, getOpenAI } from "@/lib/openai";
 
 export const NO_INFO_REPLY =
@@ -21,6 +22,210 @@ export type ChatSource = {
   similarity: number;
   urun_url?: string | null;
 };
+
+export const RAG_TOOLS: ChatCompletionTool[] = [
+  {
+    type: "function",
+    function: {
+      name: "search_products",
+      description:
+        "ORES mağaza ürün kataloğunda arama, boyut filtreleme ve fiyat/stok sıralaması yapar.",
+      parameters: {
+        type: "object",
+        properties: {
+          query: {
+            type: "string",
+            description: "Arama kelimesi (örn. çerçeve, ahşap, alüminyum)",
+          },
+          size: {
+            type: "string",
+            description: "Ürün boyutu (örn. A4, A3, A1, B1, B2, 70x100)",
+          },
+          sort_by: {
+            type: "string",
+            enum: ["price_desc", "price_asc", "stock_desc", "relevance"],
+            description:
+              "Sıralama: price_desc (en pahalı), price_asc (en ucuz), stock_desc (en çok stok), relevance (varsayılan)",
+          },
+          min_price: {
+            type: "number",
+            description: "Minimum fiyat TL",
+          },
+          max_price: {
+            type: "number",
+            description: "Maksimum fiyat TL",
+          },
+          limit: {
+            type: "number",
+            description: "Getirilecek maksimum ürün sayısı (varsayılan: 5)",
+          },
+        },
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "get_policy_info",
+      description:
+        "İade şartları, kargo ücreti, teslimat süreleri ve mağaza politikaları hakkında bilgi arar.",
+      parameters: {
+        type: "object",
+        properties: {
+          topic: {
+            type: "string",
+            description: "Politika arama terimi (örn. iade, kargo, ödeme)",
+          },
+        },
+        required: ["topic"],
+      },
+    },
+  },
+];
+
+export type ProductSearchArgs = {
+  query?: string;
+  size?: string;
+  sort_by?: "price_desc" | "price_asc" | "stock_desc" | "relevance";
+  min_price?: number;
+  max_price?: number;
+  limit?: number;
+};
+
+export async function executeProductSearch(
+  supabase: SupabaseClient,
+  args: ProductSearchArgs,
+  userQuery = "",
+): Promise<MatchedDocument[]> {
+  const desiredLimit = Math.max(args.limit ?? 5, 3);
+
+  // Özel sayısal sıralama isteniyorsa (en pahalı / en ucuz / en çok stok) verileri hafızada tam sayısal sırala
+  if (args.sort_by && args.sort_by !== "relevance") {
+    const { data, error } = await supabase
+      .from("documents")
+      .select("id, content, metadata, source_type, source_id, source_title")
+      .eq("source_type", "urun");
+
+    if (!error && data && data.length > 0) {
+      let docs = data as MatchedDocument[];
+
+      if (args.size) {
+        const targetSize = args.size.toUpperCase();
+        docs = docs.filter((d) => {
+          const docSize = (d.metadata?.boyut as string)?.toUpperCase() || "";
+          return docSize === targetSize || d.source_title.toUpperCase().includes(targetSize);
+        });
+      }
+
+      if (args.max_price != null) {
+        docs = docs.filter((d) => Number(d.metadata?.fiyat_tl || 0) <= (args.max_price as number));
+      }
+
+      if (args.min_price != null) {
+        docs = docs.filter((d) => Number(d.metadata?.fiyat_tl || 0) >= (args.min_price as number));
+      }
+
+      if (args.sort_by === "price_desc") {
+        docs.sort((a, b) => Number(b.metadata?.fiyat_tl || 0) - Number(a.metadata?.fiyat_tl || 0));
+      } else if (args.sort_by === "price_asc") {
+        docs.sort((a, b) => Number(a.metadata?.fiyat_tl || 0) - Number(b.metadata?.fiyat_tl || 0));
+      } else if (args.sort_by === "stock_desc") {
+        docs.sort((a, b) => Number(b.metadata?.stok_adedi || 0) - Number(a.metadata?.stok_adedi || 0));
+      }
+
+      return docs.slice(0, desiredLimit).map((d) => ({
+        ...d,
+        similarity: 1.0,
+      }));
+    }
+  }
+
+  // Varsayılan arama: Embeddings + Hybrid RRF Arama (Sorgu boşsa kullanıcının ham mesajını kullan)
+  const searchText = args.query || args.size || userQuery || "ürünler";
+  const embedding = await embedQuery(searchText);
+  return matchDocuments(supabase, embedding, {
+    matchCount: desiredLimit,
+    filterSourceType: "urun",
+    filterSize: args.size || null,
+    filterMaxPrice: args.max_price || null,
+    queryText: searchText,
+  });
+}
+
+export async function executePolicySearch(
+  supabase: SupabaseClient,
+  args: { topic: string },
+  userQuery = "",
+): Promise<MatchedDocument[]> {
+  const searchText = `${args.topic || ""} ${userQuery}`.trim();
+  const embedding = await embedQuery(searchText);
+  return matchDocuments(supabase, embedding, {
+    matchCount: 4,
+    filterSourceType: "politika",
+    matchThreshold: 0.15,
+    queryText: searchText,
+  });
+}
+
+export async function resolveMatchesViaTools(
+  supabase: SupabaseClient,
+  query: string,
+): Promise<MatchedDocument[]> {
+  const openai = getOpenAI();
+
+  try {
+    const res = await openai.chat.completions.create({
+      model: CHAT_MODEL,
+      temperature: 0.0,
+      messages: [
+        {
+          role: "system",
+          content:
+            "Sen ORES Mağaza arama yönlendiricisisin. Kullanıcının sorusuna cevap verecek verileri çekmek için arama araçlarını (search_products veya get_policy_info) çağır.",
+        },
+        { role: "user", content: query },
+      ],
+      tools: RAG_TOOLS,
+      tool_choice: "auto",
+    });
+
+    const choiceMessage = res.choices[0]?.message;
+    const toolCalls = choiceMessage?.tool_calls;
+
+    if (toolCalls && toolCalls.length > 0) {
+      for (const toolCall of toolCalls) {
+        if (toolCall.type === "function") {
+          const fnName = toolCall.function.name;
+          const args = JSON.parse(toolCall.function.arguments || "{}");
+
+          if (fnName === "search_products") {
+            return await executeProductSearch(supabase, args, query);
+          }
+          if (fnName === "get_policy_info") {
+            return await executePolicySearch(supabase, args, query);
+          }
+        }
+      }
+    }
+  } catch (err) {
+    console.error("resolveMatchesViaTools hatası:", err);
+  }
+
+  // Fallback: Standart Hibrit Vektör Araması
+  const filterSourceType = detectSourceTypeFilter(query);
+  const filterMaxPrice = detectMaxPriceFilter(query);
+  const filterCategory = detectCategoryFilter(query);
+  const filterSize = detectSizeFilter(query);
+  const embedding = await embedQuery(query);
+
+  return matchDocuments(supabase, embedding, {
+    filterSourceType,
+    filterMaxPrice,
+    filterCategory,
+    filterSize,
+    queryText: query,
+  });
+}
 
 /** Selamlama / kısa sohbet — RAG ve kaynak göstermeden yanıtlanır */
 export function isSmallTalk(question: string): boolean {

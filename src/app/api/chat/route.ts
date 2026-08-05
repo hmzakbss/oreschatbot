@@ -14,6 +14,7 @@ import {
   isSmallTalk,
   matchDocuments,
   NO_INFO_REPLY,
+  resolveMatchesViaTools,
   toSources,
   type AnswerResult,
 } from "@/lib/rag";
@@ -167,18 +168,7 @@ export async function POST(request: Request) {
       }
 
       const standaloneQuery = await contextualizeQuery(message, history);
-      const embedding = await embedQuery(standaloneQuery);
-      const filterSourceType = detectSourceTypeFilter(standaloneQuery);
-      const filterMaxPrice = detectMaxPriceFilter(standaloneQuery);
-      const filterCategory = detectCategoryFilter(standaloneQuery);
-      const filterSize = detectSizeFilter(standaloneQuery);
-      const matches = await matchDocuments(supabase, embedding, {
-        filterSourceType,
-        filterMaxPrice,
-        filterCategory,
-        filterSize,
-        queryText: standaloneQuery,
-      });
+      const matches = await resolveMatchesViaTools(supabase, standaloneQuery);
 
       const { stream: openaiStream } = await generateAnswerStream(
         message,
@@ -305,18 +295,7 @@ export async function POST(request: Request) {
       answer = await generateSmallTalkReply(message);
     } else {
       const standaloneQuery = await contextualizeQuery(message, history);
-      const embedding = await embedQuery(standaloneQuery);
-      const filterSourceType = detectSourceTypeFilter(standaloneQuery);
-      const filterMaxPrice = detectMaxPriceFilter(standaloneQuery);
-      const filterCategory = detectCategoryFilter(standaloneQuery);
-      const filterSize = detectSizeFilter(standaloneQuery);
-      const matches = await matchDocuments(supabase, embedding, {
-        filterSourceType,
-        filterMaxPrice,
-        filterCategory,
-        filterSize,
-        queryText: standaloneQuery,
-      });
+      const matches = await resolveMatchesViaTools(supabase, standaloneQuery);
       answer = await generateAnswer(message, matches);
     }
 
