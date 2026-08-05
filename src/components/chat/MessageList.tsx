@@ -40,37 +40,53 @@ export function MessageList({
   loading?: boolean;
   onSuggest?: (text: string) => void;
 }) {
-  const endRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const isUserScrolledUp = useRef(false);
+
+  const handleScroll = () => {
+    if (!containerRef.current) return;
+    const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+    const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
+    isUserScrolledUp.current = distanceFromBottom > 120;
+  };
 
   useEffect(() => {
-    endRef.current?.scrollIntoView({ behavior: "smooth" });
+    if (messages.length <= 1) {
+      isUserScrolledUp.current = false;
+    }
+  }, [messages.length]);
+
+  useEffect(() => {
+    if (!isUserScrolledUp.current && containerRef.current) {
+      containerRef.current.scrollTop = containerRef.current.scrollHeight;
+    }
   }, [messages, loading]);
 
   if (!messages.length && !loading) {
     return (
       <div className="flex flex-1 items-center justify-center px-6 py-10">
         <div className="max-w-lg text-center">
-          <span className="animate-rise mx-auto inline-flex h-14 w-14 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
-            <Sparkles className="h-7 w-7" aria-hidden />
+          <span className="animate-rise animate-float mx-auto inline-flex h-16 w-16 items-center justify-center rounded-3xl bg-indigo-600 text-white shadow-[0_4px_20px_rgba(79,70,229,0.35)]">
+            <Sparkles className="h-8 w-8" aria-hidden />
           </span>
-          <p className="animate-rise-delay-1 font-display mt-5 text-3xl font-semibold tracking-tight text-ink">
-            Ne öğrenmek istersin?
+          <p className="animate-rise-delay-1 font-display mt-6 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+            Ne Öğrenmek İstersin?
           </p>
-          <p className="animate-rise-delay-2 mt-3 text-sm leading-6 text-[var(--muted)]">
-            Ürün veya politika sor. Cevaplar yalnızca bilgi tabanından gelir.
+          <p className="animate-rise-delay-2 mt-3 text-sm leading-6 text-slate-600">
+            Ürün teknik özellikleri veya mağaza politikaları hakkında soru sorabilirsin.
           </p>
-          <div className="mt-7 flex flex-wrap justify-center gap-2.5">
+          <div className="mt-8 flex flex-wrap justify-center gap-2.5">
             {SUGGESTIONS.map((q, i) => (
               <button
                 key={q.text}
                 type="button"
                 disabled={!onSuggest}
                 onClick={() => onSuggest?.(q.text)}
-                className="chip-btn chip-enter glass-panel inline-flex max-w-full items-center gap-2 rounded-xl px-3.5 py-2.5 text-left text-xs text-ink"
-                style={{ animationDelay: `${0.12 + i * 0.07}s` }}
+                className="chip-btn chip-enter bento-card inline-flex max-w-full items-center gap-2.5 rounded-2xl px-4 py-3 text-left text-xs font-medium text-slate-700 border-indigo-100 hover:border-indigo-300 shadow-sm"
+                style={{ animationDelay: `${0.1 + i * 0.06}s` }}
               >
                 <q.icon
-                  className="h-3.5 w-3.5 shrink-0 text-[var(--accent)]"
+                  className="h-4 w-4 shrink-0 text-indigo-600"
                   aria-hidden
                 />
                 <span>{q.text}</span>
@@ -83,28 +99,42 @@ export function MessageList({
   }
 
   return (
-    <div className="flex-1 space-y-4 overflow-y-auto px-4 py-6 sm:px-6">
-      {messages.map((message) => {
+    <div
+      ref={containerRef}
+      onScroll={handleScroll}
+      className="flex-1 space-y-5 overflow-y-auto px-4 py-6 sm:px-6 scroll-smooth"
+    >
+      {messages.map((message, idx) => {
         const isUser = message.role === "user";
+        const isLastAssistant =
+          !isUser && loading && idx === messages.length - 1;
+
         return (
           <div
             key={message.id}
             className={`msg-enter flex ${isUser ? "justify-end" : "justify-start"}`}
           >
             <div
-              className={`flex max-w-[88%] gap-2 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+              className={`flex max-w-[85%] sm:max-w-[78%] gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
             >
               {!isUser ? (
-                <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
-                  <Bot className="h-4 w-4" aria-hidden />
+                <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
+                  <Bot className="h-4.5 w-4.5" aria-hidden />
                 </span>
               ) : null}
               <div
-                className={`rounded-2xl px-4 py-3 text-sm leading-6 shadow-[0_8px_24px_rgba(13,20,28,0.06)] ${
-                  isUser ? "bg-ink text-white" : "glass-panel text-ink"
+                className={`rounded-3xl px-5 py-3.5 text-sm leading-6 transition-all ${
+                  isUser
+                    ? "btn-indigo text-white font-medium shadow-[0_6px_20px_rgba(79,70,229,0.25)]"
+                    : "glass-panel border-slate-200/80 bg-white/90 text-slate-800 shadow-sm"
                 }`}
               >
-                <p className="whitespace-pre-wrap">{message.content}</p>
+                <div className="whitespace-pre-wrap">
+                  {message.content}
+                  {isLastAssistant ? (
+                    <span className="streaming-cursor" aria-hidden />
+                  ) : null}
+                </div>
                 {!isUser ? (
                   <SourceList sources={message.sources ?? []} />
                 ) : null}
@@ -114,27 +144,27 @@ export function MessageList({
         );
       })}
 
-      {loading ? (
+      {loading &&
+      (!messages.length ||
+        messages[messages.length - 1]?.role === "user") ? (
         <div className="msg-enter flex justify-start">
-          <div className="flex gap-2">
-            <span className="mt-1 inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--accent-soft)] text-[var(--accent)]">
-              <Bot className="h-4 w-4" aria-hidden />
+          <div className="flex gap-3">
+            <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
+              <Bot className="h-4.5 w-4.5" aria-hidden />
             </span>
-            <div className="glass-panel rounded-2xl px-4 py-3 text-sm text-[var(--muted)]">
-              <span className="inline-flex items-center gap-2">
-                <span className="inline-flex gap-1">
+            <div className="glass-panel border-slate-200/80 bg-white/90 rounded-3xl px-5 py-3.5 text-xs text-slate-600">
+              <span className="inline-flex items-center gap-2.5 font-medium">
+                <span className="inline-flex gap-1.5">
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                 </span>
-                Yanıt hazırlanıyor…
+                ORES AI yanıt hazırlıyor…
               </span>
             </div>
           </div>
         </div>
       ) : null}
-
-      <div ref={endRef} />
     </div>
   );
 }

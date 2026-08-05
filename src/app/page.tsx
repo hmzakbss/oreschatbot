@@ -98,60 +98,86 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   return (
-    <main className="app-atmosphere min-h-full flex-1">
+    <main className="app-atmosphere min-h-full flex-1 text-slate-800 selection:bg-indigo-600 selection:text-white">
       <div className="atmosphere-grid" aria-hidden />
 
-      {/* Hero — tek kompozisyon */}
-      <section className="relative mx-auto flex w-full max-w-5xl flex-col px-6 pb-16 pt-10 sm:pt-14">
-        <nav className="animate-fade flex items-center justify-between gap-4">
-          <div className="font-display text-sm font-semibold tracking-tight text-ink">
-            ORES <span className="brand-shine">Chatbot</span>
+      {/* Floating Navbar */}
+      <header className="fixed top-4 inset-x-0 z-40 mx-auto max-w-5xl px-4">
+        <nav className="animate-fade flex items-center justify-between gap-4 rounded-full border border-slate-200/80 bg-white/80 px-6 py-3.5 backdrop-blur-2xl shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+          <div className="flex items-center gap-2.5">
+            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-xs shadow-[0_4px_12px_rgba(79,70,229,0.3)]">
+              Ö
+            </span>
+            <div className="font-display text-sm font-semibold tracking-tight text-slate-900">
+              ORES <span className="brand-shine font-bold">AI Chatbot</span>
+            </div>
           </div>
-          <a
-            href="https://ores.com.tr/hakkimizda/"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-[var(--muted)] transition hover:text-ink"
-          >
-            ores.com.tr
-            <ArrowRight className="h-3.5 w-3.5" aria-hidden />
-          </a>
+
+          <div className="flex items-center gap-3">
+            <a
+              href="https://ores.com.tr/hakkimizda/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition"
+            >
+              ores.com.tr
+              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+            </a>
+            {user ? (
+              <Link
+                href="/sohbet"
+                className="btn-indigo inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-semibold"
+              >
+                <MessageSquareText className="h-3.5 w-3.5" aria-hidden />
+                Sohbet
+              </Link>
+            ) : (
+              <Link
+                href="/giris"
+                className="btn-indigo inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-semibold"
+              >
+                <LogIn className="h-3.5 w-3.5" aria-hidden />
+                Giriş
+              </Link>
+            )}
+          </div>
         </nav>
+      </header>
 
-        <div className="mt-16 sm:mt-24">
-          <p className="animate-fade inline-flex items-center gap-2 text-xs font-medium uppercase tracking-[0.2em] text-[var(--muted)]">
-            <Award className="h-3.5 w-3.5 text-[var(--accent)]" aria-hidden />
-            1992’den beri · ORES Tanıtım Sistemleri
-          </p>
+      {/* Hero Section — Light Mode Bento */}
+      <section className="relative mx-auto flex w-full max-w-5xl flex-col px-6 pb-20 pt-32 sm:pt-40">
+        <div className="flex flex-col items-center text-center">
+          <div className="animate-fade inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50/80 px-4 py-1.5 text-xs font-medium text-indigo-700 backdrop-blur-md shadow-sm">
+            <Award className="h-3.5 w-3.5 text-indigo-600" aria-hidden />
+            <span>1992’den Beri · Akıllı RAG Mağaza Asistanı</span>
+          </div>
 
-          <h1 className="animate-rise font-display mt-5 max-w-3xl text-5xl font-semibold leading-[1.02] tracking-tight text-ink sm:text-7xl">
-            ORES
-            <span className="brand-shine mt-1 block">Chatbot</span>
+          <h1 className="animate-rise font-display mt-6 max-w-4xl text-4xl font-bold leading-[1.08] tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
+            Display ve Tanıtımda
+            <span className="brand-shine mt-2 block">Işık Hızında Yapay Zeka</span>
           </h1>
 
-          <p className="animate-rise-delay-1 mt-6 max-w-xl text-base leading-7 text-[var(--muted)] sm:text-lg">
-            Görsel iletişimin olduğu her yerdeyiz. Bu asistan; mağaza ürünleri
-            ve politikalar hakkında yalnızca bilgi tabanına dayanarak cevap
-            verir, kaynağını da gösterir.
+          <p className="animate-rise-delay-1 mt-6 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+            ORES Mağaza ürünleri ve politikaları hakkında sıfır halüsinasyon garantisi ile sorularınızı yanıtlar. Kaynaklı, doğrulanmış ve anlık akıcı sohbet deneyimi.
           </p>
 
-          <div className="animate-rise-delay-2 mt-10 flex flex-wrap gap-3">
+          <div className="animate-rise-delay-2 mt-10 flex flex-wrap justify-center gap-4">
             {user ? (
               <>
                 <Link
                   href="/sohbet"
-                  className="btn-primary inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-sm font-medium text-white"
+                  className="btn-indigo inline-flex h-13 items-center gap-2.5 rounded-2xl px-7 text-sm font-semibold shadow-lg"
                 >
-                  <MessageSquareText className="h-4 w-4" aria-hidden />
-                  Sohbete git
+                  <MessageSquareText className="h-4.5 w-4.5" aria-hidden />
+                  Sohbete Başla
                 </Link>
                 <form action="/cikis" method="post">
                   <button
                     type="submit"
-                    className="btn-ghost glass-panel inline-flex h-12 items-center gap-2 rounded-xl px-5 text-sm font-medium text-ink"
+                    className="btn-ghost glass-panel inline-flex h-13 items-center gap-2 rounded-2xl px-6 text-sm font-medium text-slate-700 border-slate-200"
                   >
-                    <LogOut className="h-4 w-4" aria-hidden />
-                    Çıkış
+                    <LogOut className="h-4.5 w-4.5" aria-hidden />
+                    Çıkış Yap
                   </button>
                 </form>
               </>
@@ -159,93 +185,94 @@ export default async function HomePage() {
               <>
                 <Link
                   href="/giris"
-                  className="btn-primary inline-flex h-12 items-center gap-2 rounded-xl bg-ink px-6 text-sm font-medium text-white"
+                  className="btn-indigo inline-flex h-13 items-center gap-2.5 rounded-2xl px-7 text-sm font-semibold shadow-lg"
                 >
-                  <LogIn className="h-4 w-4" aria-hidden />
-                  Giriş yap
+                  <LogIn className="h-4.5 w-4.5" aria-hidden />
+                  Giriş Yap ve Dene
                 </Link>
                 <Link
                   href="/kayit"
-                  className="btn-ghost glass-panel inline-flex h-12 items-center gap-2 rounded-xl px-5 text-sm font-medium text-ink"
+                  className="btn-ghost glass-panel inline-flex h-13 items-center gap-2.5 rounded-2xl px-6 text-sm font-medium text-slate-700 border-slate-200"
                 >
-                  <Users className="h-4 w-4" aria-hidden />
-                  Kayıt ol
+                  <Users className="h-4.5 w-4.5" aria-hidden />
+                  Hesap Oluştur
                 </Link>
               </>
             )}
           </div>
-
-          {user?.email ? (
-            <p className="mt-5 text-sm text-[var(--muted)]">{user.email}</p>
-          ) : null}
         </div>
       </section>
 
-      {/* Biz kimiz */}
-      <section className="relative border-t border-[var(--line)] bg-white/35 py-16 backdrop-blur-sm">
-        <div className="mx-auto grid w-full max-w-5xl gap-10 px-6 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
-          <div className="animate-rise">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--accent)]">
-              Biz kimiz?
+      {/* Bento Grid — Biz Kimiz & İstatistikler */}
+      <section className="relative border-t border-slate-200/80 bg-white/60 py-20 backdrop-blur-md">
+        <div className="mx-auto max-w-5xl px-6">
+          <div className="text-center max-w-2xl mx-auto">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+              Güvenilir Üretim Gücü
             </p>
-            <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
-              Reklam ve tanıtımda 1992’den beri üretiyoruz
+            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
+              1992’den Beri Reklam ve Tanıtım Teknolojileri
             </h2>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-[var(--muted)] sm:text-base">
-              ORES; afiş çerçevelerinden teşhir ünitelerine, baskıdan lojistiğe
-              kadar display dünyasında tasarım ve üretim sunar. Kaliteyi ilk
-              prensip kabul eder; ürünlerinin arkasında durur.
-            </p>
           </div>
-          <div className="animate-rise-delay-1 grid grid-cols-2 gap-3">
-            <div className="glass-panel rounded-2xl p-4">
-              <Globe2 className="h-5 w-5 text-[var(--accent)]" aria-hidden />
-              <p className="font-display mt-3 text-2xl font-semibold text-ink">
-                Global
-              </p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Ürünler birçok ülkeye ulaşıyor
+
+          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="bento-card p-6">
+              <Globe2 className="h-7 w-7 text-indigo-600" aria-hidden />
+              <p className="font-display mt-4 text-3xl font-bold text-slate-900">Global</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Almanya ve Avrupa genelinde uluslararası ihracat ağı.
               </p>
             </div>
-            <div className="glass-panel rounded-2xl p-4">
-              <Factory className="h-5 w-5 text-[var(--accent)]" aria-hidden />
-              <p className="font-display mt-3 text-2xl font-semibold text-ink">
-                ÜR-GE
+            <div className="bento-card p-6">
+              <Factory className="h-7 w-7 text-indigo-600" aria-hidden />
+              <p className="font-display mt-4 text-3xl font-bold text-slate-900">ÜR-GE</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                200+ alüminyum profil tasarımı ve sürekli ürün geliştirme.
               </p>
-              <p className="mt-1 text-xs text-[var(--muted)]">
-                Sürekli ürün geliştirme
+            </div>
+            <div className="bento-card p-6">
+              <Boxes className="h-7 w-7 text-indigo-600" aria-hidden />
+              <p className="font-display mt-4 text-3xl font-bold text-slate-900">Modüler</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Yedek parça ve garanti sonrası uzun ömürlü aksesuar desteği.
+              </p>
+            </div>
+            <div className="bento-card p-6">
+              <ShieldCheck className="h-7 w-7 text-indigo-600" aria-hidden />
+              <p className="font-display mt-4 text-3xl font-bold text-slate-900">%100 Doğruluk</p>
+              <p className="mt-2 text-xs leading-5 text-slate-500">
+                Yalnızca veritabanındaki resmi bilgilere dayalı cevaplar.
               </p>
             </div>
           </div>
         </div>
       </section>
 
-      {/* Neden ORES */}
-      <section className="relative py-16">
+      {/* Bento Grid — Neden ORES */}
+      <section className="relative py-20">
         <div className="mx-auto w-full max-w-5xl px-6">
           <div className="max-w-2xl">
-            <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--accent)]">
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
               Neden ORES?
             </p>
-            <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-ink">
-              Görsel iletişimin olduğu her yerdeyiz
+            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-slate-900">
+              Görsel İletişimin Olduğu Her Yerdeyiz
             </h2>
           </div>
-          <ul className="mt-10 grid gap-4 sm:grid-cols-2">
+          <ul className="mt-10 grid gap-5 sm:grid-cols-2">
             {reasons.map((item, i) => (
               <li
                 key={item.title}
-                className="chip-enter glass-panel rounded-2xl p-5"
+                className="bento-card p-6"
                 style={{ animationDelay: `${0.05 + i * 0.06}s` }}
               >
-                <item.icon
-                  className="h-5 w-5 text-[var(--accent)]"
-                  aria-hidden
-                />
-                <h3 className="mt-3 text-sm font-semibold text-ink">
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                  <item.icon className="h-5 w-5" aria-hidden />
+                </div>
+                <h3 className="mt-4 text-base font-semibold text-slate-900">
                   {item.title}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   {item.text}
                 </p>
               </li>
@@ -254,27 +281,26 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Yetenekler */}
-      <section className="relative border-y border-[var(--line)] bg-ink py-16 text-white">
+      {/* Production Capabilities */}
+      <section className="relative border-y border-slate-200/80 bg-white/70 py-20 text-slate-900 backdrop-blur-xl">
         <div className="mx-auto w-full max-w-5xl px-6">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--accent)]">
-            Üretim yetenekleri
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+            Üretim Yeteneklerimiz
           </p>
-          <h2 className="font-display mt-3 max-w-xl text-3xl font-semibold tracking-tight">
-            Tasarımından sevkiyata, tek çatı altında
+          <h2 className="font-display mt-3 max-w-xl text-3xl font-bold tracking-tight">
+            Tasarımından Sevkiyata Tek Çatı Altında
           </h2>
-          <ul className="mt-10 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
             {capabilities.map((item) => (
               <li
                 key={item.title}
-                className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur"
+                className="bento-card p-6"
               >
-                <item.icon
-                  className="h-5 w-5 text-[var(--accent)]"
-                  aria-hidden
-                />
-                <h3 className="mt-3 text-sm font-semibold">{item.title}</h3>
-                <p className="mt-2 text-sm leading-6 text-white/65">
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                  <item.icon className="h-5 w-5" aria-hidden />
+                </div>
+                <h3 className="mt-4 text-base font-semibold text-slate-900">{item.title}</h3>
+                <p className="mt-2 text-xs leading-6 text-slate-600">
                   {item.text}
                 </p>
               </li>
@@ -283,26 +309,25 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Lokasyon */}
-      <section className="relative py-16">
+      {/* Locations */}
+      <section className="relative py-20">
         <div className="mx-auto w-full max-w-5xl px-6">
-          <p className="text-xs font-medium uppercase tracking-[0.18em] text-[var(--accent)]">
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
             Lokasyonlarımız
           </p>
-          <h2 className="font-display mt-3 text-3xl font-semibold tracking-tight text-ink">
-            İhtiyacınız olan yerde yanınızdayız
+          <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-slate-900">
+            İhtiyacınız Olan Her Yerde Yanınızdayız
           </h2>
-          <ul className="mt-8 grid gap-4 md:grid-cols-3">
+          <ul className="mt-10 grid gap-5 md:grid-cols-3">
             {locations.map((loc) => (
-              <li key={loc.title} className="glass-panel rounded-2xl p-5">
-                <MapPin
-                  className="h-5 w-5 text-[var(--accent)]"
-                  aria-hidden
-                />
-                <h3 className="mt-3 text-sm font-semibold text-ink">
+              <li key={loc.title} className="bento-card p-6">
+                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
+                  <MapPin className="h-5 w-5" aria-hidden />
+                </div>
+                <h3 className="mt-4 text-base font-semibold text-slate-900">
                   {loc.title}
                 </h3>
-                <p className="mt-2 text-sm leading-6 text-[var(--muted)]">
+                <p className="mt-2 text-xs leading-6 text-slate-600">
                   {loc.detail}
                 </p>
               </li>
@@ -311,31 +336,31 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* Footer */}
-      <footer className="relative border-t border-[var(--line)] bg-white/40 py-10 backdrop-blur">
+      {/* Sleek Footer */}
+      <footer className="relative border-t border-slate-200 bg-white py-12 text-slate-500">
         <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <p className="font-display text-sm font-semibold text-ink">
-              ORES Chatbot
+            <p className="font-display text-sm font-bold text-slate-900">
+              ORES AI Chatbot
             </p>
-            <p className="mt-1 text-xs text-[var(--muted)]">
-              Kaynak:{" "}
+            <p className="mt-1 text-xs text-slate-500">
+              Resmi Site:{" "}
               <a
                 href="https://ores.com.tr/hakkimizda/"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="underline hover:text-ink"
+                className="underline hover:text-indigo-600 transition"
               >
                 ores.com.tr/hakkimizda
               </a>
             </p>
           </div>
-          <div className="flex flex-wrap gap-4 text-xs text-[var(--muted)]">
+          <div className="flex flex-wrap gap-5 text-xs text-slate-600">
             <a
               href="https://magaza.ores.com.tr"
               target="_blank"
               rel="noopener noreferrer"
-              className="transition hover:text-ink"
+              className="transition hover:text-slate-900"
             >
               Mağaza
             </a>
@@ -343,12 +368,12 @@ export default async function HomePage() {
               href="https://ores.com.tr"
               target="_blank"
               rel="noopener noreferrer"
-              className="transition hover:text-ink"
+              className="transition hover:text-slate-900"
             >
-              Kurumsal site
+              Kurumsal Site
             </a>
-            <Link href="/sohbet" className="transition hover:text-ink">
-              Sohbet
+            <Link href="/sohbet" className="transition hover:text-indigo-600 font-semibold">
+              Sohbet Uygulaması →
             </Link>
           </div>
         </div>
