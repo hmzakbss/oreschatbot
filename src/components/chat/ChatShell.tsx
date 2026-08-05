@@ -49,6 +49,7 @@ export function ChatShell({
 
   const loadConversation = useCallback(async (id: string) => {
     setLoadingMessages(true);
+    setMessages([]);
     setError(null);
     setActiveId(id);
     setSidebarOpen(false);

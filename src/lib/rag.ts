@@ -29,7 +29,7 @@ export const RAG_TOOLS: ChatCompletionTool[] = [
     function: {
       name: "search_products",
       description:
-        "ORES mağaza ürün kataloğunda arama, renk, profil kalınlığı, stok kodu (SKU), boyut filtreleme ve fiyat/stok sıralaması yapar.",
+        "ORES mağaza ürün kataloğunda arama, renk, profil kalınlığı, köşe tipi (Rondo/Gönye), kategori, malzeme, indirim durumu, stok kodu (SKU), boyut filtreleme ve fiyat/stok sıralaması yapar.",
       strict: true,
       parameters: {
         type: "object",
@@ -53,6 +53,26 @@ export const RAG_TOOLS: ChatCompletionTool[] = [
           profile_thickness_mm: {
             type: ["number", "null"],
             description: "Profil kalınlığı mm cinsinden (örn. 25, 32)",
+          },
+          corner_type: {
+            type: ["string", "null"],
+            description: "Köşe tipi (örn. Rondo, Gönye)",
+          },
+          category: {
+            type: ["string", "null"],
+            description: "Kategori (örn. Afiş Çerçevesi, Reklam Panosu)",
+          },
+          material: {
+            type: ["string", "null"],
+            description: "Gövde malzemesi (örn. Alüminyum, Ahşap, Plastik)",
+          },
+          is_discounted: {
+            type: ["boolean", "null"],
+            description: "Yalnızca indirimdeki ürünleri filtrele (true/false)",
+          },
+          max_weight_kg: {
+            type: ["number", "null"],
+            description: "Maksimum ağırlık kg cinsinden",
           },
           sort_by: {
             type: ["string", "null"],
@@ -79,6 +99,11 @@ export const RAG_TOOLS: ChatCompletionTool[] = [
           "size",
           "color",
           "profile_thickness_mm",
+          "corner_type",
+          "category",
+          "material",
+          "is_discounted",
+          "max_weight_kg",
           "sort_by",
           "min_price",
           "max_price",
@@ -116,6 +141,11 @@ export type ProductSearchArgs = {
   size?: string | null;
   color?: string | null;
   profile_thickness_mm?: number | null;
+  corner_type?: string | null;
+  category?: string | null;
+  material?: string | null;
+  is_discounted?: boolean | null;
+  max_weight_kg?: number | null;
   sort_by?: "price_desc" | "price_asc" | "stock_desc" | "relevance" | null;
   min_price?: number | null;
   max_price?: number | null;
@@ -183,6 +213,63 @@ export async function executeProductSearch(
         const docMm = Number(d.metadata?.profil_kalinligi_mm || 0);
         return docMm === targetMm || d.source_title.includes(`${targetMm}mm`);
       });
+    }
+
+    // Köşe Tipi Filtresi (Rondo / Gönye)
+    if (args.corner_type) {
+      isFiltered = true;
+      const targetCorner = args.corner_type.toLocaleLowerCase("tr");
+      docs = docs.filter((d) => {
+        const docCorner = (d.metadata?.kose_tipi as string)?.toLocaleLowerCase("tr") || "";
+        return (
+          docCorner.includes(targetCorner) ||
+          d.source_title.toLocaleLowerCase("tr").includes(targetCorner) ||
+          d.content.toLocaleLowerCase("tr").includes(targetCorner)
+        );
+      });
+    }
+
+    // Kategori Filtresi
+    if (args.category) {
+      isFiltered = true;
+      const targetCategory = args.category.toLocaleLowerCase("tr");
+      docs = docs.filter((d) => {
+        const docCat = (d.metadata?.kategori as string)?.toLocaleLowerCase("tr") || "";
+        return (
+          docCat.includes(targetCategory) ||
+          d.source_title.toLocaleLowerCase("tr").includes(targetCategory)
+        );
+      });
+    }
+
+    // Gövde Malzemesi Filtresi
+    if (args.material) {
+      isFiltered = true;
+      const targetMaterial = args.material.toLocaleLowerCase("tr");
+      docs = docs.filter((d) => {
+        const docMat = (d.metadata?.malzeme as string)?.toLocaleLowerCase("tr") || "";
+        return (
+          docMat.includes(targetMaterial) ||
+          d.source_title.toLocaleLowerCase("tr").includes(targetMaterial) ||
+          d.content.toLocaleLowerCase("tr").includes(targetMaterial)
+        );
+      });
+    }
+
+    // İndirimli Ürün Filtresi
+    if (args.is_discounted) {
+      isFiltered = true;
+      docs = docs.filter((d) => {
+        const disc = d.metadata?.indirimli_fiyat_tl;
+        return disc != null && disc !== "" && Number(disc) > 0;
+      });
+    }
+
+    // Ağırlık (kg) Filtresi
+    if (args.max_weight_kg != null) {
+      isFiltered = true;
+      const targetWeight = Number(args.max_weight_kg);
+      docs = docs.filter((d) => Number(d.metadata?.agirlik_kg || 0) <= targetWeight);
     }
 
     // Fiyat Filtreleri

@@ -64,6 +64,24 @@ export function MessageList({
     }
   }, [messages, loading]);
 
+  if (loadingMessages && !messages.length) {
+    return (
+      <div className="flex flex-1 items-center justify-center px-6 py-10">
+        <div className="bento-card inline-flex items-center gap-3 rounded-3xl bg-white/95 px-6 py-4 text-sm font-medium text-slate-700 border-indigo-100 shadow-md animate-rise">
+          <Bot className="h-5 w-5 text-indigo-600 animate-pulse" aria-hidden />
+          <span className="inline-flex items-center gap-2.5">
+            <span className="inline-flex gap-1.5">
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+              <span className="typing-dot" />
+            </span>
+            Sohbet yükleniyor…
+          </span>
+        </div>
+      </div>
+    );
+  }
+
   if (!messages.length && !loading) {
     return (
       <div className="flex flex-1 items-center justify-center px-6 py-10">
