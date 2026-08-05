@@ -148,6 +148,36 @@ export function detectCategoryFilter(question: string): string | null {
   return null;
 }
 
+export function detectSizeFilter(question: string): string | null {
+  const q = question
+    .toLocaleLowerCase("tr")
+    .replace(/[?!.,…]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  if (!q) return null;
+
+  // Genel politika / kargo sorularını boyut filtresine sokma
+  if (/iade|kargo|teslimat|ödeme|odeme|gizlilik|çerez|cerez/i.test(q)) {
+    return null;
+  }
+
+  // A0-A4, B1-B3 ve 70x100 gibi ölçü desenlerini yakala
+  const matches = q.match(/\b(a[0-4]|b[1-3]|\d{2,3}x\d{2,3})\b/gi);
+  if (!matches) return null;
+
+  const uniqueSizes = Array.from(
+    new Set(matches.map((s) => s.toUpperCase())),
+  );
+
+  // Yalnızca tek bir boyut belirtilmişse kesin filtre döndür
+  if (uniqueSizes.length === 1) {
+    return uniqueSizes[0];
+  }
+
+  return null;
+}
+
 export function detectMaxPriceFilter(question: string): number | null {
   const q = question.toLocaleLowerCase("tr");
   if (/kargo|iade|teslimat|sepet|sipariş|siparis/i.test(q)) {
@@ -218,6 +248,78 @@ KURALLAR:
   }
 }
 
+/**
+ * Hybrid Ranking (Dense Cosine Similarity + Sparse Lexical SKU Search Fusion)
+ * Reciprocal Rank Fusion (RRF) & Token Match Scoring
+ */
+export function applyHybridRerank(
+  matches: MatchedDocument[],
+  queryText: string,
+  limit = 6,
+): MatchedDocument[] {
+  if (!matches || matches.length === 0) return [];
+
+  const normalizedQuery = queryText
+    .toLocaleLowerCase("tr")
+    .replace(/[?!.,…]+/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const queryTokens = normalizedQuery
+    .split(" ")
+    .filter((t) => t.length > 1);
+
+  const codeTokens = normalizedQuery.match(/\b[a-z0-9-]+\b/g) || [];
+
+  const scoredDocs = matches.map((doc, vectorRank) => {
+    const contentLower = doc.content.toLocaleLowerCase("tr");
+    const titleLower = doc.source_title.toLocaleLowerCase("tr");
+    const idLower = doc.source_id.toLocaleLowerCase("tr");
+
+    let lexicalScore = 0;
+
+    // 1. Exact SKU / ID match boost
+    for (const code of codeTokens) {
+      if (code.length >= 2) {
+        if (idLower === code || idLower.includes(code)) {
+          lexicalScore += 1.5;
+        }
+        if (titleLower.includes(code)) {
+          lexicalScore += 0.8;
+        }
+      }
+    }
+
+    // 2. Keyword token match boost
+    for (const token of queryTokens) {
+      if (token.length > 2) {
+        if (titleLower.includes(token)) {
+          lexicalScore += 0.4;
+        } else if (contentLower.includes(token)) {
+          lexicalScore += 0.2;
+        }
+      }
+    }
+
+    // 3. Reciprocal Rank Fusion (RRF) score calculation
+    const vectorRrf = 1 / (60 + (vectorRank + 1));
+    const combinedScore =
+      doc.similarity * 0.6 + lexicalScore * 0.4 + vectorRrf;
+
+    return {
+      doc: {
+        ...doc,
+        similarity: Number(combinedScore.toFixed(4)),
+      },
+      combinedScore,
+    };
+  });
+
+  scoredDocs.sort((a, b) => b.combinedScore - a.combinedScore);
+
+  return scoredDocs.slice(0, limit).map((item) => item.doc);
+}
+
 export async function matchDocuments(
   supabase: SupabaseClient,
   queryEmbedding: number[],
@@ -227,14 +329,18 @@ export async function matchDocuments(
     filterSourceType?: string | null;
     filterCategory?: string | null;
     filterMaxPrice?: number | null;
+    filterSize?: string | null;
+    queryText?: string | null;
   },
 ): Promise<MatchedDocument[]> {
   const threshold =
     options?.matchThreshold ?? (options?.filterMaxPrice ? 0.1 : 0.35);
 
+  const desiredLimit = options?.matchCount ?? 6;
+
   const { data, error } = await supabase.rpc("match_documents", {
     query_embedding: queryEmbedding,
-    match_count: options?.matchCount ?? 6,
+    match_count: desiredLimit * 3,
     filter_source_type: options?.filterSourceType ?? null,
     filter_category: options?.filterCategory ?? null,
     filter_max_price: options?.filterMaxPrice ?? null,
@@ -245,7 +351,38 @@ export async function matchDocuments(
     throw new Error(`match_documents hatası: ${error.message}`);
   }
 
-  return (data ?? []) as MatchedDocument[];
+  let rawMatches = (data ?? []) as MatchedDocument[];
+
+  // Boyut Filtresi Uygula (Örn: A4, A3, B1)
+  if (options?.filterSize) {
+    const targetSize = options.filterSize.toLocaleLowerCase("tr");
+    const sizeFiltered = rawMatches.filter((m) => {
+      if (m.source_type === "politika") return true;
+      const docSize =
+        (m.metadata?.boyut as string)?.toLocaleLowerCase("tr") || "";
+      const titleLower = m.source_title.toLocaleLowerCase("tr");
+      const contentLower = m.content.toLocaleLowerCase("tr");
+
+      return (
+        docSize === targetSize ||
+        titleLower.includes(` ${targetSize} `) ||
+        titleLower.includes(`-${targetSize}-`) ||
+        titleLower.includes(` ${targetSize}-`) ||
+        titleLower.includes(`-${targetSize} `) ||
+        contentLower.includes(`boyut: ${targetSize}`)
+      );
+    });
+
+    if (sizeFiltered.length > 0) {
+      rawMatches = sizeFiltered;
+    }
+  }
+
+  if (options?.queryText) {
+    return applyHybridRerank(rawMatches, options.queryText, desiredLimit);
+  }
+
+  return rawMatches.slice(0, desiredLimit);
 }
 
 export function filterUsedSources(

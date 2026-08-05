@@ -4,6 +4,7 @@ import {
   contextualizeQuery,
   detectCategoryFilter,
   detectMaxPriceFilter,
+  detectSizeFilter,
   detectSourceTypeFilter,
   embedQuery,
   filterUsedSources,
@@ -170,10 +171,13 @@ export async function POST(request: Request) {
       const filterSourceType = detectSourceTypeFilter(standaloneQuery);
       const filterMaxPrice = detectMaxPriceFilter(standaloneQuery);
       const filterCategory = detectCategoryFilter(standaloneQuery);
+      const filterSize = detectSizeFilter(standaloneQuery);
       const matches = await matchDocuments(supabase, embedding, {
         filterSourceType,
         filterMaxPrice,
         filterCategory,
+        filterSize,
+        queryText: standaloneQuery,
       });
 
       const { stream: openaiStream } = await generateAnswerStream(
@@ -305,10 +309,13 @@ export async function POST(request: Request) {
       const filterSourceType = detectSourceTypeFilter(standaloneQuery);
       const filterMaxPrice = detectMaxPriceFilter(standaloneQuery);
       const filterCategory = detectCategoryFilter(standaloneQuery);
+      const filterSize = detectSizeFilter(standaloneQuery);
       const matches = await matchDocuments(supabase, embedding, {
         filterSourceType,
         filterMaxPrice,
         filterCategory,
+        filterSize,
+        queryText: standaloneQuery,
       });
       answer = await generateAnswer(message, matches);
     }
