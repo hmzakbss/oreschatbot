@@ -4,6 +4,9 @@ import { parse } from "csv-parse/sync";
 import { config as loadEnv } from "dotenv";
 import OpenAI from "openai";
 import { createClient } from "@supabase/supabase-js";
+import WebSocket from "ws";
+
+(globalThis as any).WebSocket = WebSocket;
 
 loadEnv({ path: resolve(process.cwd(), ".env.local") });
 
@@ -263,6 +266,7 @@ async function main() {
   const openai = new OpenAI({ apiKey: openaiKey });
   const supabase = createClient(supabaseUrl, serviceRole, {
     auth: { persistSession: false, autoRefreshToken: false },
+    realtime: false as any,
   });
 
   const products = buildProductDocuments();
