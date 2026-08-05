@@ -331,6 +331,7 @@ export function ChatShell({
         <MessageList
           messages={messages}
           loading={sending || loadingMessages}
+          loadingMessages={loadingMessages}
           onSuggest={(text) => {
             if (!sending) void handleSend(text);
           }}

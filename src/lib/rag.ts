@@ -29,37 +29,62 @@ export const RAG_TOOLS: ChatCompletionTool[] = [
     function: {
       name: "search_products",
       description:
-        "ORES mağaza ürün kataloğunda arama, boyut filtreleme ve fiyat/stok sıralaması yapar.",
+        "ORES mağaza ürün kataloğunda arama, renk, profil kalınlığı, stok kodu (SKU), boyut filtreleme ve fiyat/stok sıralaması yapar.",
+      strict: true,
       parameters: {
         type: "object",
         properties: {
           query: {
-            type: "string",
-            description: "Arama kelimesi (örn. çerçeve, ahşap, alüminyum)",
+            type: ["string", "null"],
+            description: "Arama kelimesi (örn. çerçeve, ahşap, alüminyum, rondo, gönye)",
+          },
+          sku: {
+            type: ["string", "null"],
+            description: "Ürün stok kodu (örn. M01 PFSS 25 070100 TKx)",
           },
           size: {
-            type: "string",
+            type: ["string", "null"],
             description: "Ürün boyutu (örn. A4, A3, A1, B1, B2, 70x100)",
           },
+          color: {
+            type: ["string", "null"],
+            description: "Ürün rengi (örn. Kırmızı, Siyah, Gümüş, Kahverengi)",
+          },
+          profile_thickness_mm: {
+            type: ["number", "null"],
+            description: "Profil kalınlığı mm cinsinden (örn. 25, 32)",
+          },
           sort_by: {
-            type: "string",
-            enum: ["price_desc", "price_asc", "stock_desc", "relevance"],
+            type: ["string", "null"],
+            enum: ["price_desc", "price_asc", "stock_desc", "relevance", null],
             description:
               "Sıralama: price_desc (en pahalı), price_asc (en ucuz), stock_desc (en çok stok), relevance (varsayılan)",
           },
           min_price: {
-            type: "number",
+            type: ["number", "null"],
             description: "Minimum fiyat TL",
           },
           max_price: {
-            type: "number",
+            type: ["number", "null"],
             description: "Maksimum fiyat TL",
           },
           limit: {
-            type: "number",
+            type: ["number", "null"],
             description: "Getirilecek maksimum ürün sayısı (varsayılan: 5)",
           },
         },
+        required: [
+          "query",
+          "sku",
+          "size",
+          "color",
+          "profile_thickness_mm",
+          "sort_by",
+          "min_price",
+          "max_price",
+          "limit",
+        ],
+        additionalProperties: false,
       },
     },
   },
@@ -69,6 +94,7 @@ export const RAG_TOOLS: ChatCompletionTool[] = [
       name: "get_policy_info",
       description:
         "İade şartları, kargo ücreti, teslimat süreleri ve mağaza politikaları hakkında bilgi arar.",
+      strict: true,
       parameters: {
         type: "object",
         properties: {
@@ -78,18 +104,22 @@ export const RAG_TOOLS: ChatCompletionTool[] = [
           },
         },
         required: ["topic"],
+        additionalProperties: false,
       },
     },
   },
 ];
 
 export type ProductSearchArgs = {
-  query?: string;
-  size?: string;
-  sort_by?: "price_desc" | "price_asc" | "stock_desc" | "relevance";
-  min_price?: number;
-  max_price?: number;
-  limit?: number;
+  query?: string | null;
+  sku?: string | null;
+  size?: string | null;
+  color?: string | null;
+  profile_thickness_mm?: number | null;
+  sort_by?: "price_desc" | "price_asc" | "stock_desc" | "relevance" | null;
+  min_price?: number | null;
+  max_price?: number | null;
+  limit?: number | null;
 };
 
 export async function executeProductSearch(
@@ -99,40 +129,85 @@ export async function executeProductSearch(
 ): Promise<MatchedDocument[]> {
   const desiredLimit = Math.max(args.limit ?? 5, 3);
 
-  // Özel sayısal sıralama isteniyorsa (en pahalı / en ucuz / en çok stok) verileri hafızada tam sayısal sırala
-  if (args.sort_by && args.sort_by !== "relevance") {
-    const { data, error } = await supabase
-      .from("documents")
-      .select("id, content, metadata, source_type, source_id, source_title")
-      .eq("source_type", "urun");
+  // Belirli bir filtre veya sıralama varsa verileri hafızada tam filtrelere göre süz
+  const { data, error } = await supabase
+    .from("documents")
+    .select("id, content, metadata, source_type, source_id, source_title")
+    .eq("source_type", "urun");
 
-    if (!error && data && data.length > 0) {
-      let docs = data as MatchedDocument[];
+  if (!error && data && data.length > 0) {
+    let docs = data as MatchedDocument[];
+    let isFiltered = false;
 
-      if (args.size) {
-        const targetSize = args.size.toUpperCase();
-        docs = docs.filter((d) => {
-          const docSize = (d.metadata?.boyut as string)?.toUpperCase() || "";
-          return docSize === targetSize || d.source_title.toUpperCase().includes(targetSize);
-        });
+    // SKU Koduna Göre Tam Eşleşme
+    if (args.sku) {
+      const cleanSku = args.sku.trim().toUpperCase();
+      const skuMatched = docs.filter(
+        (d) =>
+          d.source_id.toUpperCase().includes(cleanSku) ||
+          d.source_title.toUpperCase().includes(cleanSku),
+      );
+      if (skuMatched.length > 0) {
+        return skuMatched.map((d) => ({ ...d, similarity: 1.0 }));
       }
+    }
 
-      if (args.max_price != null) {
-        docs = docs.filter((d) => Number(d.metadata?.fiyat_tl || 0) <= (args.max_price as number));
-      }
+    // Boyut Filtresi
+    if (args.size) {
+      isFiltered = true;
+      const targetSize = args.size.toUpperCase();
+      docs = docs.filter((d) => {
+        const docSize = (d.metadata?.boyut as string)?.toUpperCase() || "";
+        return docSize === targetSize || d.source_title.toUpperCase().includes(targetSize);
+      });
+    }
 
-      if (args.min_price != null) {
-        docs = docs.filter((d) => Number(d.metadata?.fiyat_tl || 0) >= (args.min_price as number));
-      }
+    // Renk Filtresi
+    if (args.color) {
+      isFiltered = true;
+      const targetColor = args.color.toLocaleLowerCase("tr");
+      docs = docs.filter((d) => {
+        const docColor = (d.metadata?.renk as string)?.toLocaleLowerCase("tr") || "";
+        return (
+          docColor.includes(targetColor) ||
+          d.source_title.toLocaleLowerCase("tr").includes(targetColor)
+        );
+      });
+    }
 
-      if (args.sort_by === "price_desc") {
-        docs.sort((a, b) => Number(b.metadata?.fiyat_tl || 0) - Number(a.metadata?.fiyat_tl || 0));
-      } else if (args.sort_by === "price_asc") {
-        docs.sort((a, b) => Number(a.metadata?.fiyat_tl || 0) - Number(b.metadata?.fiyat_tl || 0));
-      } else if (args.sort_by === "stock_desc") {
-        docs.sort((a, b) => Number(b.metadata?.stok_adedi || 0) - Number(a.metadata?.stok_adedi || 0));
-      }
+    // Profil Kalınlığı (mm) Filtresi
+    if (args.profile_thickness_mm != null) {
+      isFiltered = true;
+      const targetMm = Number(args.profile_thickness_mm);
+      docs = docs.filter((d) => {
+        const docMm = Number(d.metadata?.profil_kalinligi_mm || 0);
+        return docMm === targetMm || d.source_title.includes(`${targetMm}mm`);
+      });
+    }
 
+    // Fiyat Filtreleri
+    if (args.max_price != null) {
+      isFiltered = true;
+      docs = docs.filter((d) => Number(d.metadata?.fiyat_tl || 0) <= (args.max_price as number));
+    }
+    if (args.min_price != null) {
+      isFiltered = true;
+      docs = docs.filter((d) => Number(d.metadata?.fiyat_tl || 0) >= (args.min_price as number));
+    }
+
+    // Sıralama
+    if (args.sort_by === "price_desc") {
+      isFiltered = true;
+      docs.sort((a, b) => Number(b.metadata?.fiyat_tl || 0) - Number(a.metadata?.fiyat_tl || 0));
+    } else if (args.sort_by === "price_asc") {
+      isFiltered = true;
+      docs.sort((a, b) => Number(a.metadata?.fiyat_tl || 0) - Number(b.metadata?.fiyat_tl || 0));
+    } else if (args.sort_by === "stock_desc") {
+      isFiltered = true;
+      docs.sort((a, b) => Number(b.metadata?.stok_adedi || 0) - Number(a.metadata?.stok_adedi || 0));
+    }
+
+    if (isFiltered && docs.length > 0) {
       return docs.slice(0, desiredLimit).map((d) => ({
         ...d,
         similarity: 1.0,
@@ -140,8 +215,12 @@ export async function executeProductSearch(
     }
   }
 
-  // Varsayılan arama: Embeddings + Hybrid RRF Arama (Sorgu boşsa kullanıcının ham mesajını kullan)
-  const searchText = args.query || args.size || userQuery || "ürünler";
+  // Varsayılan Hibrit Vektör Araması (Sorguda meşe/ağaç geçiyorsa ahşap desenli kaplamaya genişlet)
+  let searchText = args.query || args.size || userQuery || "ürünler";
+  if (/meşe|ağaç|agac/i.test(searchText)) {
+    searchText = `${searchText} ahşap desenli kaplama alüminyum gövde`;
+  }
+
   const embedding = await embedQuery(searchText);
   return matchDocuments(supabase, embedding, {
     matchCount: desiredLimit,

@@ -34,10 +34,12 @@ const SUGGESTIONS = [
 export function MessageList({
   messages,
   loading,
+  loadingMessages,
   onSuggest,
 }: {
   messages: ChatMessage[];
   loading?: boolean;
+  loadingMessages?: boolean;
   onSuggest?: (text: string) => void;
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -159,7 +161,7 @@ export function MessageList({
                   <span className="typing-dot" />
                   <span className="typing-dot" />
                 </span>
-                ORES AI yanıt hazırlıyor…
+                {loadingMessages ? "Sohbet yükleniyor…" : "ORES AI yanıt hazırlıyor…"}
               </span>
             </div>
           </div>
