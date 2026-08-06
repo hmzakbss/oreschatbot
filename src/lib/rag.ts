@@ -23,6 +23,15 @@ export type ChatSource = {
   urun_url?: string | null;
 };
 
+/** Bir ürün dokümanının geçerli satış fiyatını hesaplar (varsa indirimli fiyat, yoksa normal fiyat) */
+export function getEffectivePrice(doc: MatchedDocument): number {
+  const disc = doc.metadata?.indirimli_fiyat_tl;
+  if (disc != null && disc !== "" && !Number.isNaN(Number(disc))) {
+    return Number(disc);
+  }
+  return Number(doc.metadata?.fiyat_tl || 0);
+}
+
 export const RAG_TOOLS: ChatCompletionTool[] = [
   {
     type: "function",
@@ -272,30 +281,34 @@ export async function executeProductSearch(
       docs = docs.filter((d) => Number(d.metadata?.agirlik_kg || 0) <= targetWeight);
     }
 
-    // Fiyat Filtreleri
+    // Fiyat Filtreleri (İndirimli fiyat varsa geçerli satış fiyatı baz alınır)
     if (args.max_price != null) {
       isFiltered = true;
-      docs = docs.filter((d) => Number(d.metadata?.fiyat_tl || 0) <= (args.max_price as number));
+      docs = docs.filter((d) => getEffectivePrice(d) <= (args.max_price as number));
     }
     if (args.min_price != null) {
       isFiltered = true;
-      docs = docs.filter((d) => Number(d.metadata?.fiyat_tl || 0) >= (args.min_price as number));
+      docs = docs.filter((d) => getEffectivePrice(d) >= (args.min_price as number));
     }
 
-    // Sıralama
+    // Sıralama (Geçerli satış fiyatına göre)
     if (args.sort_by === "price_desc") {
       isFiltered = true;
-      docs.sort((a, b) => Number(b.metadata?.fiyat_tl || 0) - Number(a.metadata?.fiyat_tl || 0));
+      docs.sort((a, b) => getEffectivePrice(b) - getEffectivePrice(a));
     } else if (args.sort_by === "price_asc") {
       isFiltered = true;
-      docs.sort((a, b) => Number(a.metadata?.fiyat_tl || 0) - Number(b.metadata?.fiyat_tl || 0));
+      docs.sort((a, b) => getEffectivePrice(a) - getEffectivePrice(b));
     } else if (args.sort_by === "stock_desc") {
       isFiltered = true;
       docs.sort((a, b) => Number(b.metadata?.stok_adedi || 0) - Number(a.metadata?.stok_adedi || 0));
     }
 
     if (isFiltered && docs.length > 0) {
-      return docs.slice(0, desiredLimit).map((d) => ({
+      const limitToUse =
+        args.max_price != null || args.min_price != null
+          ? Math.max(desiredLimit, docs.length)
+          : desiredLimit;
+      return docs.slice(0, limitToUse).map((d) => ({
         ...d,
         similarity: 1.0,
       }));
@@ -827,6 +840,8 @@ Kurallar:
 - Kaynaklarda olmayan bilgiyi uydurma.
 - Emin değilsen veya kaynaklar soruyu karşılamıyorsa aynen şu cümleyi yaz: "${NO_INFO_REPLY}"
 - Fiyat, stok, profil kalınlığı, iade, kargo gibi iddiaları yalnızca kaynaklardan al.
+- Bir ürünün hem normal fiyatı hem indirimli fiyatı varsa, geçerli satış fiyatı İNDİRİMLİ FİYAT'tır. Fiyat filtreleme ve değerlendirmelerinde indirimli fiyatı esas al.
+- Kullanıcı ürün sayısını veya liste sorduğunda kaynaklardaki ürünlerin fiyatlarını dikkatle kontrol et, matematiksel ve mantıksal çelişkiye düşmeden tüm eşleşen ürünleri eksiksiz say ve listele.
 - Kısa ve net cevap ver.
 - Kaynak numaralarını cevabın içinde yazma; kaynaklar ayrıca gösterilecek.`,
       },
@@ -876,6 +891,8 @@ Kurallar:
 - Kaynaklarda olmayan bilgiyi uydurma.
 - Emin değilsen veya kaynaklar soruyu karşılamıyorsa aynen şu cümleyi yaz: "${NO_INFO_REPLY}"
 - Fiyat, stok, profil kalınlığı, iade, kargo gibi iddiaları yalnızca kaynaklardan al.
+- Bir ürünün hem normal fiyatı hem indirimli fiyatı varsa, geçerli satış fiyatı İNDİRİMLİ FİYAT'tır. Fiyat filtreleme ve değerlendirmelerinde indirimli fiyatı esas al.
+- Kullanıcı ürün sayısını veya liste sorduğunda kaynaklardaki ürünlerin fiyatlarını dikkatle kontrol et, matematiksel ve mantıksal çelişkiye düşmeden tüm eşleşen ürünleri eksiksiz say ve listele.
 - Kısa ve net cevap ver.
 - Kaynak numaralarını cevabın içinde yazma; kaynaklar ayrıca gösterilecek.`,
       },

@@ -114,8 +114,10 @@ as $$
     and (
       filter_max_price is null
       or (
-        d.metadata ? 'fiyat_tl'
-        and (d.metadata->>'fiyat_tl')::numeric <= filter_max_price
+        coalesce(
+          nullif(d.metadata->>'indirimli_fiyat_tl', '')::numeric,
+          (d.metadata->>'fiyat_tl')::numeric
+        ) <= filter_max_price
       )
     )
     and 1 - (d.embedding <=> query_embedding) >= match_threshold
