@@ -95,6 +95,9 @@ export async function POST(request: Request) {
     });
 
     if (userMsgError) {
+      if (!body.conversationId && conversationId) {
+        await supabase.from("conversations").delete().eq("id", conversationId);
+      }
       throw new Error(userMsgError.message);
     }
 
@@ -171,7 +174,7 @@ export async function POST(request: Request) {
       const matches = await resolveMatchesViaTools(supabase, standaloneQuery);
 
       const { stream: openaiStream } = await generateAnswerStream(
-        message,
+        standaloneQuery,
         matches,
       );
 
@@ -296,7 +299,7 @@ export async function POST(request: Request) {
     } else {
       const standaloneQuery = await contextualizeQuery(message, history);
       const matches = await resolveMatchesViaTools(supabase, standaloneQuery);
-      answer = await generateAnswer(message, matches);
+      answer = await generateAnswer(standaloneQuery, matches);
     }
 
     const sources = answer.mode === "rag" ? answer.sources : [];
