@@ -5,6 +5,8 @@ import {
   Bot,
   ChevronDown,
   CircleHelp,
+  ExternalLink,
+  Headset,
   Package,
   Shield,
   Sparkles,
@@ -185,6 +187,22 @@ export function MessageList({
                   </div>
                   {!isUser ? (
                     <SourceList sources={message.sources ?? []} />
+                  ) : null}
+                  {!isUser &&
+                  (message.content.includes("satış danışmanı") ||
+                    message.content.includes("net bir bilgi yok")) ? (
+                    <div className="mt-3">
+                      <a
+                        href="https://ores.com.tr/iletisim/#form"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-indigo-700 hover:shadow"
+                      >
+                        <Headset className="h-4 w-4" aria-hidden />
+                        <span>İletişim Formuna Git</span>
+                        <ExternalLink className="h-3.5 w-3.5 opacity-80" aria-hidden />
+                      </a>
+                    </div>
                   ) : null}
                   {timeLabel ? (
                     <p
