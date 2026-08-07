@@ -18,10 +18,7 @@ export async function executeProductSearch(
   const desiredLimit = Math.max(args.limit ?? 5, 3);
 
   // Belirli bir filtre veya sıralama varsa verileri hafızada tam filtrelere göre süz
-  const { data, error } = await supabase
-    .from("documents")
-    .select("id, content, metadata, source_type, source_id, source_title")
-    .eq("source_type", "urun");
+  const { data, error } = await supabase.rpc("get_product_documents");
 
   if (!error && data && data.length > 0) {
     let docs = data as MatchedDocument[];

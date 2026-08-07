@@ -52,11 +52,6 @@ alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
 
 drop policy if exists "documents_select_authenticated" on public.documents;
-create policy "documents_select_authenticated"
-  on public.documents
-  for select
-  to authenticated
-  using (true);
 
 drop policy if exists "conversations_own_all" on public.conversations;
 create policy "conversations_own_all"
@@ -74,7 +69,34 @@ create policy "messages_own_all"
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 
--- Vektör arama (+ opsiyonel fiyat/kategori filtresi)
+-- Ürün dokümanlarını çeken güvenli RPC fonksiyonu (security definer)
+create or replace function public.get_product_documents()
+returns table (
+  id uuid,
+  content text,
+  metadata jsonb,
+  source_type text,
+  source_id text,
+  source_title text
+)
+language sql
+security definer
+stable
+as $$
+  select
+    d.id,
+    d.content,
+    d.metadata,
+    d.source_type,
+    d.source_id,
+    d.source_title
+  from public.documents d
+  where d.source_type = 'urun';
+$$;
+
+grant execute on function public.get_product_documents() to authenticated, service_role;
+
+-- Vektör arama (+ opsiyonel fiyat/kategori filtresi) - security definer
 create or replace function public.match_documents (
   query_embedding extensions.vector(1536),
   match_count int default 6,
@@ -93,6 +115,7 @@ returns table (
   similarity float
 )
 language sql
+security definer
 stable
 as $$
   select
