@@ -102,6 +102,7 @@ export function SocialLinks({
             }`}
           >
             <span className="social-btn-glow" aria-hidden />
+            <span className="social-shimmer" aria-hidden />
             <span className="social-icon-wrap">{social.icon}</span>
             {!compact ? (
               <span className="social-label">{social.name}</span>

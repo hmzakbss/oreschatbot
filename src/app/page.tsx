@@ -149,41 +149,40 @@ export default async function HomePage() {
 
   return (
     <LandingScroller>
-      <header className="pointer-events-none fixed top-4 inset-x-0 z-40 mx-auto max-w-5xl px-4">
-        <nav className="nav-glass pointer-events-auto flex items-center justify-between gap-4 rounded-full border border-slate-200/80 bg-white/80 px-6 py-3.5 backdrop-blur-2xl shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
-          <div className="flex items-center gap-2.5">
-            <span className="logo-mark flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-600 text-xs font-bold text-white shadow-[0_4px_12px_rgba(79,70,229,0.3)]">
-              O
-            </span>
-            <div className="font-display text-sm font-semibold tracking-tight text-slate-900">
-              ORES <span className="brand-shine font-bold">AI Chatbot</span>
+      <header className="pointer-events-none fixed top-4 sm:top-5 inset-x-0 z-40 mx-auto w-full flex justify-center px-4">
+        <nav className="nav-glass pointer-events-auto flex items-center justify-center gap-4 sm:gap-8 rounded-full border border-slate-200/90 bg-white/85 px-6 sm:px-8 py-3.5 sm:py-4 backdrop-blur-2xl shadow-[0_10px_35px_rgba(15,23,42,0.08)]">
+          <div className="flex items-center gap-3 sm:gap-3.5">
+            <div className="font-display text-base sm:text-lg lg:text-xl font-bold tracking-tight text-slate-900">
+              ORES <span className="brand-shine font-extrabold">AI Chatbot</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="h-5 w-px bg-slate-200/80 hidden sm:block" />
+
+          <div className="flex items-center gap-3 sm:gap-4">
             <a
               href="https://ores.com.tr/hakkimizda/"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-900"
+              className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-slate-600 transition-all duration-200 hover:text-indigo-600 hover:bg-indigo-50/80 px-3.5 py-1.5 sm:py-2 rounded-full"
             >
               ores.com.tr
-              <ArrowRight className="h-3.5 w-3.5" aria-hidden />
+              <ArrowRight className="h-4 w-4" aria-hidden />
             </a>
             {user ? (
               <Link
                 href="/sohbet"
-                className="btn-indigo animate-cta-pulse inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-semibold"
+                className="btn-indigo animate-cta-pulse inline-flex h-10 sm:h-11 items-center gap-2 rounded-full px-5 sm:px-6 text-xs sm:text-sm font-semibold shadow-md shadow-indigo-500/20"
               >
-                <MessageSquareText className="h-3.5 w-3.5" aria-hidden />
+                <MessageSquareText className="h-4 w-4" aria-hidden />
                 Sohbet
               </Link>
             ) : (
               <Link
                 href="/giris"
-                className="btn-indigo animate-cta-pulse inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-semibold"
+                className="btn-indigo animate-cta-pulse inline-flex h-10 sm:h-11 items-center gap-2 rounded-full px-5 sm:px-6 text-xs sm:text-sm font-semibold shadow-md shadow-indigo-500/20"
               >
-                <LogIn className="h-3.5 w-3.5" aria-hidden />
+                <LogIn className="h-4 w-4" aria-hidden />
                 Giriş
               </Link>
             )}
