@@ -9,7 +9,12 @@ import { createClient } from "@/lib/supabase/client";
 function GirisForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const next = searchParams.get("next") || "/sohbet";
+  const rawNext = searchParams.get("next");
+
+  let next = "/sohbet";
+  if (rawNext && rawNext.startsWith("/") && !rawNext.startsWith("//")) {
+    next = rawNext;
+  }
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
