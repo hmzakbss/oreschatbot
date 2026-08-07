@@ -56,6 +56,7 @@ function buildProductDocuments(): DocumentRow[] {
     const profil = row.profil_kalinligi_mm
       ? Number(row.profil_kalinligi_mm)
       : null;
+    const agirlik = row.agirlik_kg ? Number(row.agirlik_kg) : null;
 
     const content = [
       `Ürün: ${row.urun_adi}`,
@@ -91,6 +92,7 @@ function buildProductDocuments(): DocumentRow[] {
       metadata: {
         sku: row.sku,
         kategori: row.kategori,
+        agirlik_kg: Number.isFinite(agirlik) ? agirlik : null,
         fiyat_tl: Number.isFinite(fiyat) ? fiyat : null,
         indirimli_fiyat_tl: row.indirimli_fiyat_tl
           ? Number(row.indirimli_fiyat_tl)

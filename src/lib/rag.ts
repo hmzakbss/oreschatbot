@@ -5,6 +5,17 @@ import { CHAT_MODEL, EMBEDDING_MODEL, getOpenAI } from "@/lib/openai";
 export const NO_INFO_REPLY =
   "Bu konuda elimde net bir bilgi yok, isterseniz sizi yetkili satış danışmanımıza yönlendirebilirim.";
 
+export const RAG_SYSTEM_PROMPT = `Sen ORES Mağaza müşteri asistanısın. Yalnızca aşağıda verilen KAYNAK metinlerine dayanarak Türkçe cevap ver.
+
+Kurallar:
+- Kaynaklarda olmayan bilgiyi uydurma.
+- Emin değilsen veya kaynaklar soruyu karşılamıyorsa aynen şu cümleyi yaz: "${NO_INFO_REPLY}"
+- Fiyat, stok, profil kalınlığı, iade, kargo gibi iddiaları yalnızca kaynaklardan al.
+- Bir ürünün hem normal fiyatı hem indirimli fiyatı varsa, geçerli satış fiyatı İNDİRİMLİ FİYAT'tır. Fiyat filtreleme ve değerlendirmelerinde indirimli fiyatı esas al.
+- Kullanıcı ürün sayısını veya liste sorduğunda kaynaklardaki ürünlerin fiyatlarını dikkatle kontrol et, matematiksel ve mantıksal çelişkiye düşmeden tüm eşleşen ürünleri eksiksiz say ve listele.
+- Kısa ve net cevap ver.
+- Kaynak numaralarını cevabın içinde yazma; kaynaklar ayrıca gösterilecek.`;
+
 export type MatchedDocument = {
   id: string;
   content: string;
@@ -178,17 +189,16 @@ export async function executeProductSearch(
     let docs = data as MatchedDocument[];
     let isFiltered = false;
 
-    // SKU Koduna Göre Tam Eşleşme
+    // SKU Koduna Göre Eşleşme (Diğer filtrelerin çalışmasını engellemeyecek şekilde süzgeç uygulanır)
     if (args.sku) {
+      isFiltered = true;
       const cleanSku = args.sku.trim().toUpperCase();
-      const skuMatched = docs.filter(
+      docs = docs.filter(
         (d) =>
+          d.source_id.toUpperCase() === cleanSku ||
           d.source_id.toUpperCase().includes(cleanSku) ||
           d.source_title.toUpperCase().includes(cleanSku),
       );
-      if (skuMatched.length > 0) {
-        return skuMatched.map((d) => ({ ...d, similarity: 1.0 }));
-      }
     }
 
     // Boyut Filtresi
@@ -278,7 +288,11 @@ export async function executeProductSearch(
     if (args.max_weight_kg != null) {
       isFiltered = true;
       const targetWeight = Number(args.max_weight_kg);
-      docs = docs.filter((d) => Number(d.metadata?.agirlik_kg || 0) <= targetWeight);
+      docs = docs.filter((d) => {
+        const weight = d.metadata?.agirlik_kg;
+        if (weight == null || Number.isNaN(Number(weight))) return false;
+        return Number(weight) <= targetWeight;
+      });
     }
 
     // Fiyat Filtreleri (İndirimli fiyat varsa geçerli satış fiyatı baz alınır)
@@ -325,6 +339,7 @@ export async function executeProductSearch(
   return matchDocuments(supabase, embedding, {
     matchCount: desiredLimit,
     filterSourceType: "urun",
+    filterCategory: args.category || null,
     filterSize: args.size || null,
     filterMaxPrice: args.max_price || null,
     queryText: searchText,
@@ -372,18 +387,32 @@ export async function resolveMatchesViaTools(
     const toolCalls = choiceMessage?.tool_calls;
 
     if (toolCalls && toolCalls.length > 0) {
+      const allResults: MatchedDocument[] = [];
+      const seenIds = new Set<string>();
+
       for (const toolCall of toolCalls) {
         if (toolCall.type === "function") {
           const fnName = toolCall.function.name;
           const args = JSON.parse(toolCall.function.arguments || "{}");
 
+          let docs: MatchedDocument[] = [];
           if (fnName === "search_products") {
-            return await executeProductSearch(supabase, args, query);
+            docs = await executeProductSearch(supabase, args, query);
+          } else if (fnName === "get_policy_info") {
+            docs = await executePolicySearch(supabase, args, query);
           }
-          if (fnName === "get_policy_info") {
-            return await executePolicySearch(supabase, args, query);
+
+          for (const doc of docs) {
+            if (!seenIds.has(doc.id)) {
+              seenIds.add(doc.id);
+              allResults.push(doc);
+            }
           }
         }
+      }
+
+      if (allResults.length > 0) {
+        return allResults;
       }
     }
   } catch (err) {
@@ -779,9 +808,40 @@ export function filterUsedSources(
     const titleLower = m.source_title.toLocaleLowerCase("tr");
     const idLower = m.source_id.toLocaleLowerCase("tr");
 
+    // 1. SKU / ID tam veya parçalı eşleşme
     if (idLower.length > 2 && contentLower.includes(idLower)) return true;
+
+    // 2. Başlık tam eşleşme
     if (titleLower.length > 2 && contentLower.includes(titleLower)) return true;
 
+    // 3. Ürün dokümanları için hassas boyut/model kontrolü
+    if (m.source_type === "urun") {
+      // Başlıktaki boyut/ölçü kodlarını çıkar (A0-A4, B1-B3, 21x30 vb.)
+      const sizeTokens = titleLower.match(/\b(a[0-4]|b[1-3]|\d{2,3}x\d{2,3})\b/gi);
+      if (sizeTokens && sizeTokens.length > 0) {
+        // Ürünün başlığında boyut varsa, cevap metninde de bu boyutlardan en az biri geçmelidir
+        const hasSizeMatch = sizeTokens.some((st) =>
+          contentLower.includes(st.toLocaleLowerCase("tr")),
+        );
+        if (!hasSizeMatch) return false;
+      }
+
+      // Rondo vs Gönye köşe ayrımı
+      if (titleLower.includes("rondo") && !contentLower.includes("rondo")) {
+        return false;
+      }
+      if (titleLower.includes("gönye") && !contentLower.includes("gönye") && titleLower.includes("rondo")) {
+        return false;
+      }
+
+      // Genel kelime eşleşmesi (en az 3 ayırt edici kelime eşleşmeli)
+      const cleanTitle = titleLower.replace(/[^a-z0-9çğıöşü\s]/gi, " ");
+      const words = cleanTitle.split(/\s+/).filter((w) => w.length > 2);
+      const matchingWords = words.filter((w) => contentLower.includes(w));
+      return matchingWords.length >= Math.min(3, words.length);
+    }
+
+    // 4. Politika dokümanları için başlık eşleşmesi
     const cleanTitle = titleLower.replace(/[^a-z0-9çğıöşü\s]/gi, " ");
     const words = cleanTitle.split(/\s+/).filter((w) => w.length > 3);
     if (words.length >= 2) {
@@ -834,16 +894,7 @@ export async function generateAnswer(
     messages: [
       {
         role: "system",
-        content: `Sen ORES Mağaza müşteri asistanısın. Yalnızca aşağıda verilen KAYNAK metinlerine dayanarak Türkçe cevap ver.
-
-Kurallar:
-- Kaynaklarda olmayan bilgiyi uydurma.
-- Emin değilsen veya kaynaklar soruyu karşılamıyorsa aynen şu cümleyi yaz: "${NO_INFO_REPLY}"
-- Fiyat, stok, profil kalınlığı, iade, kargo gibi iddiaları yalnızca kaynaklardan al.
-- Bir ürünün hem normal fiyatı hem indirimli fiyatı varsa, geçerli satış fiyatı İNDİRİMLİ FİYAT'tır. Fiyat filtreleme ve değerlendirmelerinde indirimli fiyatı esas al.
-- Kullanıcı ürün sayısını veya liste sorduğunda kaynaklardaki ürünlerin fiyatlarını dikkatle kontrol et, matematiksel ve mantıksal çelişkiye düşmeden tüm eşleşen ürünleri eksiksiz say ve listele.
-- Kısa ve net cevap ver.
-- Kaynak numaralarını cevabın içinde yazma; kaynaklar ayrıca gösterilecek.`,
+        content: RAG_SYSTEM_PROMPT,
       },
       {
         role: "user",
@@ -885,16 +936,7 @@ export async function generateAnswerStream(
     messages: [
       {
         role: "system",
-        content: `Sen ORES Mağaza müşteri asistanısın. Yalnızca aşağıda verilen KAYNAK metinlerine dayanarak Türkçe cevap ver.
-
-Kurallar:
-- Kaynaklarda olmayan bilgiyi uydurma.
-- Emin değilsen veya kaynaklar soruyu karşılamıyorsa aynen şu cümleyi yaz: "${NO_INFO_REPLY}"
-- Fiyat, stok, profil kalınlığı, iade, kargo gibi iddiaları yalnızca kaynaklardan al.
-- Bir ürünün hem normal fiyatı hem indirimli fiyatı varsa, geçerli satış fiyatı İNDİRİMLİ FİYAT'tır. Fiyat filtreleme ve değerlendirmelerinde indirimli fiyatı esas al.
-- Kullanıcı ürün sayısını veya liste sorduğunda kaynaklardaki ürünlerin fiyatlarını dikkatle kontrol et, matematiksel ve mantıksal çelişkiye düşmeden tüm eşleşen ürünleri eksiksiz say ve listele.
-- Kısa ve net cevap ver.
-- Kaynak numaralarını cevabın içinde yazma; kaynaklar ayrıca gösterilecek.`,
+        content: RAG_SYSTEM_PROMPT,
       },
       {
         role: "user",
