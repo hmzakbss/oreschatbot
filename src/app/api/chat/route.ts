@@ -1,18 +1,14 @@
 import { NextResponse } from "next/server";
+import type { SupabaseClient, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { checkRateLimit } from "@/lib/rateLimit";
 import {
   contextualizeQuery,
-  detectCategoryFilter,
-  detectMaxPriceFilter,
-  detectSizeFilter,
-  detectSourceTypeFilter,
-  embedQuery,
   filterUsedSources,
   generateAnswer,
   generateAnswerStream,
   generateSmallTalkReply,
   isSmallTalk,
-  matchDocuments,
   NO_INFO_REPLY,
   resolveMatchesViaTools,
   toSources,
@@ -24,6 +20,68 @@ type ChatRequestBody = {
   conversationId?: string | null;
   stream?: boolean;
 };
+
+const MAX_MESSAGE_LENGTH = 1500;
+const encoder = new TextEncoder();
+
+/** SSE formatında olay paketi gönderir */
+function sendSSEEvent(
+  controller: ReadableStreamDefaultController,
+  event: Record<string, unknown>,
+) {
+  controller.enqueue(encoder.encode(`data: ${JSON.stringify(event)}\n\n`));
+}
+
+/** SSE akış yanıtı için gerekli HTTP başlıklarını oluşturur */
+function createSSEResponse(stream: ReadableStream) {
+  return new Response(stream, {
+    headers: {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+    },
+  });
+}
+
+/** Tek seferlik statik metinler (SmallTalk veya NoInfo) için SSE akışı üretir */
+function createStaticStreamResponse({
+  content,
+  conversationId,
+  user,
+  supabase,
+}: {
+  content: string;
+  conversationId: string | null;
+  user: User;
+  supabase: SupabaseClient;
+}) {
+  const stream = new ReadableStream({
+    async start(controller) {
+      sendSSEEvent(controller, {
+        type: "metadata",
+        conversationId,
+        sources: [],
+      });
+      sendSSEEvent(controller, {
+        type: "token",
+        content,
+      });
+
+      await supabase.from("messages").insert({
+        conversation_id: conversationId,
+        user_id: user.id,
+        role: "assistant",
+        content,
+        sources: [],
+      });
+
+      sendSSEEvent(controller, { type: "done" });
+      controller.close();
+    },
+  });
+
+  return createSSEResponse(stream);
+}
 
 function makeTitle(message: string): string {
   const cleaned = message.replace(/\s+/g, " ").trim();
@@ -41,12 +99,32 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Oturum gerekli" }, { status: 401 });
     }
 
+    // Rate Limit Kontrolü (Kullanıcı başına dakikada maks 10 istek)
+    const rateLimit = checkRateLimit(user.id, 10, 60 * 1000);
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        {
+          error: `Çok fazla mesaj gönderdiniz. Lütfen ${rateLimit.resetInSec} saniye bekleyin.`,
+        },
+        { status: 429 },
+      );
+    }
+
     const body = (await request.json()) as ChatRequestBody;
     const message = body.message?.trim();
 
     if (!message) {
       return NextResponse.json(
         { error: "message alanı zorunlu" },
+        { status: 400 },
+      );
+    }
+
+    if (message.length > MAX_MESSAGE_LENGTH) {
+      return NextResponse.json(
+        {
+          error: `Mesaj uzunluğu en fazla ${MAX_MESSAGE_LENGTH} karakter olabilir.`,
+        },
         { status: 400 },
       );
     }
@@ -121,52 +199,15 @@ export async function POST(request: Request) {
       content: string;
     }[];
 
+    // Stream modu
     if (body.stream) {
-      const encoder = new TextEncoder();
-
       if (isSmallTalk(message)) {
         const smallTalk = await generateSmallTalkReply(message);
-        const stream = new ReadableStream({
-          async start(controller) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "metadata",
-                  conversationId,
-                  sources: [],
-                })}\n\n`,
-              ),
-            );
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "token",
-                  content: smallTalk.content,
-                })}\n\n`,
-              ),
-            );
-
-            await supabase.from("messages").insert({
-              conversation_id: conversationId,
-              user_id: user.id,
-              role: "assistant",
-              content: smallTalk.content,
-              sources: [],
-            });
-
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`),
-            );
-            controller.close();
-          },
-        });
-
-        return new Response(stream, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-          },
+        return createStaticStreamResponse({
+          content: smallTalk.content,
+          conversationId,
+          user,
+          supabase,
         });
       }
 
@@ -179,75 +220,31 @@ export async function POST(request: Request) {
       );
 
       if (!openaiStream) {
-        const stream = new ReadableStream({
-          async start(controller) {
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "metadata",
-                  conversationId,
-                  sources: [],
-                })}\n\n`,
-              ),
-            );
-            controller.enqueue(
-              encoder.encode(
-                `data: ${JSON.stringify({
-                  type: "token",
-                  content: NO_INFO_REPLY,
-                })}\n\n`,
-              ),
-            );
-
-            await supabase.from("messages").insert({
-              conversation_id: conversationId,
-              user_id: user.id,
-              role: "assistant",
-              content: NO_INFO_REPLY,
-              sources: [],
-            });
-
-            controller.enqueue(
-              encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`),
-            );
-            controller.close();
-          },
-        });
-
-        return new Response(stream, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            "Connection": "keep-alive",
-          },
+        return createStaticStreamResponse({
+          content: NO_INFO_REPLY,
+          conversationId,
+          user,
+          supabase,
         });
       }
 
       const stream = new ReadableStream({
         async start(controller) {
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "metadata",
-                conversationId,
-                sources: [],
-              })}\n\n`,
-            ),
-          );
+          sendSSEEvent(controller, {
+            type: "metadata",
+            conversationId,
+            sources: [],
+          });
 
           let fullText = "";
           for await (const chunk of openaiStream) {
             const token = chunk.choices[0]?.delta?.content || "";
             if (token) {
               fullText += token;
-              controller.enqueue(
-                encoder.encode(
-                  `data: ${JSON.stringify({
-                    type: "token",
-                    content: token,
-                  })}\n\n`,
-                ),
-              );
+              sendSSEEvent(controller, {
+                type: "token",
+                content: token,
+              });
             }
           }
 
@@ -259,14 +256,10 @@ export async function POST(request: Request) {
             : filterUsedSources(matches, finalContent);
           const finalSources = toSources(usedMatches);
 
-          controller.enqueue(
-            encoder.encode(
-              `data: ${JSON.stringify({
-                type: "sources",
-                sources: finalSources,
-              })}\n\n`,
-            ),
-          );
+          sendSSEEvent(controller, {
+            type: "sources",
+            sources: finalSources,
+          });
 
           await supabase.from("messages").insert({
             conversation_id: conversationId,
@@ -276,22 +269,15 @@ export async function POST(request: Request) {
             sources: finalSources,
           });
 
-          controller.enqueue(
-            encoder.encode(`data: ${JSON.stringify({ type: "done" })}\n\n`),
-          );
+          sendSSEEvent(controller, { type: "done" });
           controller.close();
         },
       });
 
-      return new Response(stream, {
-        headers: {
-          "Content-Type": "text/event-stream",
-          "Cache-Control": "no-cache",
-          "Connection": "keep-alive",
-        },
-      });
+      return createSSEResponse(stream);
     }
 
+    // Normal (Standart JSON) Mod
     let answer: AnswerResult;
 
     if (isSmallTalk(message)) {

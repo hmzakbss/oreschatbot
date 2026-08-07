@@ -32,6 +32,7 @@ export function MessageInput({
             value={value}
             onChange={(e) => setValue(e.target.value)}
             disabled={disabled}
+            maxLength={1500}
             placeholder="ORES AI'ya soru sor (Örn. iade süresi kaç gün?)..."
             className="h-13 w-full rounded-full border border-slate-200 bg-white px-5 text-sm text-slate-900 placeholder-slate-400 outline-none transition duration-200 focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 disabled:opacity-50 shadow-sm"
           />
