@@ -120,6 +120,7 @@ export function useChatStream({
         role: "user",
         content: text,
         sources: [],
+        created_at: new Date().toISOString(),
       },
     ]);
 
@@ -150,6 +151,7 @@ export function useChatStream({
           role: "assistant",
           content: "",
           sources: [],
+          created_at: new Date().toISOString(),
         },
       ]);
 

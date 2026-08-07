@@ -10,6 +10,10 @@ import {
   UserPlus,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { translateAuthError } from "@/lib/auth-errors";
+
+const inputClass =
+  "h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-slate-900 outline-none transition focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10";
 
 export default function KayitPage() {
   const [email, setEmail] = useState("");
@@ -37,7 +41,7 @@ export default function KayitPage() {
     setLoading(false);
 
     if (signUpError) {
-      setError(signUpError.message);
+      setError(translateAuthError(signUpError.message));
       return;
     }
 
@@ -50,20 +54,20 @@ export default function KayitPage() {
         <div className="atmosphere-grid" aria-hidden />
         <div className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-6 py-16">
           <div className="animate-rise glass-panel rounded-2xl p-7 sm:p-8">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[var(--accent-soft)] text-[var(--accent)]">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 text-indigo-600">
               <MailCheck className="h-6 w-6" aria-hidden />
             </span>
-            <h1 className="font-display mt-5 text-3xl font-semibold tracking-tight text-ink">
+            <h1 className="font-display mt-5 text-3xl font-semibold tracking-tight text-slate-900">
               E-postanı doğrula
             </h1>
-            <p className="mt-3 text-sm leading-6 text-[var(--muted)]">
-              <span className="font-medium text-ink">{email}</span> adresine
-              doğrulama bağlantısı gönderdik. Bağlantıya tıkladıktan sonra giriş
-              yapabilirsin.
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              <span className="font-medium text-slate-900">{email}</span>{" "}
+              adresine doğrulama bağlantısı gönderdik. Bağlantıya tıkladıktan
+              sonra giriş yapabilirsin.
             </p>
             <Link
               href="/giris"
-              className="btn-primary mt-8 inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-ink px-4 text-sm font-medium text-white"
+              className="btn-indigo mt-8 inline-flex h-11 items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold"
             >
               Giriş sayfasına git
               <ArrowRight className="h-4 w-4" aria-hidden />
@@ -81,19 +85,19 @@ export default function KayitPage() {
         <div className="animate-rise glass-panel rounded-2xl p-7 sm:p-8">
           <Link
             href="/"
-            className="font-display text-sm font-semibold tracking-tight text-ink"
+            className="font-display text-sm font-semibold tracking-tight text-slate-900"
           >
             ORES <span className="brand-shine">Chatbot</span>
           </Link>
           <div className="mt-6 flex items-center gap-3">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600">
               <UserPlus className="h-5 w-5" aria-hidden />
             </span>
             <div>
-              <h1 className="font-display text-3xl font-semibold tracking-tight text-ink">
+              <h1 className="font-display text-3xl font-semibold tracking-tight text-slate-900">
                 Kayıt ol
               </h1>
-              <p className="mt-1 text-sm text-[var(--muted)]">
+              <p className="mt-1 text-sm text-slate-500">
                 Doğrulama maili zorunludur
               </p>
             </div>
@@ -101,8 +105,8 @@ export default function KayitPage() {
 
           <form onSubmit={onSubmit} className="mt-8 space-y-4">
             <label className="block text-sm">
-              <span className="mb-1.5 flex items-center gap-1.5 font-medium text-ink">
-                <Mail className="h-3.5 w-3.5 text-[var(--muted)]" aria-hidden />
+              <span className="mb-1.5 flex items-center gap-1.5 font-medium text-slate-900">
+                <Mail className="h-3.5 w-3.5 text-slate-400" aria-hidden />
                 E-posta
               </span>
               <input
@@ -111,16 +115,13 @@ export default function KayitPage() {
                 autoComplete="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="h-11 w-full rounded-xl border border-[var(--line)] bg-white/80 px-3 text-ink outline-none transition focus:border-ink/35 focus:shadow-[0_0_0_4px_rgba(194,120,42,0.12)]"
+                className={inputClass}
               />
             </label>
 
             <label className="block text-sm">
-              <span className="mb-1.5 flex items-center gap-1.5 font-medium text-ink">
-                <LockKeyhole
-                  className="h-3.5 w-3.5 text-[var(--muted)]"
-                  aria-hidden
-                />
+              <span className="mb-1.5 flex items-center gap-1.5 font-medium text-slate-900">
+                <LockKeyhole className="h-3.5 w-3.5 text-slate-400" aria-hidden />
                 Şifre
               </span>
               <input
@@ -130,12 +131,15 @@ export default function KayitPage() {
                 autoComplete="new-password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="h-11 w-full rounded-xl border border-[var(--line)] bg-white/80 px-3 text-ink outline-none transition focus:border-ink/35 focus:shadow-[0_0_0_4px_rgba(194,120,42,0.12)]"
+                className={inputClass}
               />
             </label>
 
             {error ? (
-              <p className="animate-rise rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <p
+                role="alert"
+                className="animate-rise rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+              >
                 {error}
               </p>
             ) : null}
@@ -143,16 +147,19 @@ export default function KayitPage() {
             <button
               type="submit"
               disabled={loading}
-              className="btn-primary inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 text-sm font-medium text-white disabled:opacity-60"
+              className="btn-indigo inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-semibold disabled:opacity-60"
             >
               {loading ? "Kaydediliyor…" : "Kayıt ol"}
               <ArrowRight className="h-4 w-4" aria-hidden />
             </button>
           </form>
 
-          <p className="mt-6 text-sm text-[var(--muted)]">
+          <p className="mt-6 text-sm text-slate-500">
             Zaten hesabın var mı?{" "}
-            <Link href="/giris" className="font-medium text-ink underline">
+            <Link
+              href="/giris"
+              className="font-medium text-indigo-600 underline underline-offset-2"
+            >
               Giriş yap
             </Link>
           </p>

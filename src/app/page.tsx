@@ -3,7 +3,9 @@ import {
   ArrowRight,
   Award,
   Boxes,
+  Database,
   Factory,
+  FileSearch,
   Globe2,
   Leaf,
   LogIn,
@@ -19,6 +21,31 @@ import {
   Wrench,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/server";
+import { FloatingChips } from "@/components/landing/FloatingChips";
+import { LandingScroller } from "@/components/landing/LandingScroller";
+import { Reveal } from "@/components/landing/Reveal";
+import { SocialLinks } from "@/components/landing/SocialLinks";
+
+const howItWorks = [
+  {
+    icon: MessageSquareText,
+    step: "1",
+    title: "Sorunu yaz",
+    text: "Ürün, fiyat, stok veya iade/kargo gibi politika sorularını doğal dilde sorun.",
+  },
+  {
+    icon: Database,
+    step: "2",
+    title: "Kaynakları bul",
+    text: "Asistan ürün kataloğu ve politika belgelerinde semantik arama yapar.",
+  },
+  {
+    icon: FileSearch,
+    step: "3",
+    title: "Kaynaklı cevap",
+    text: "Yanıtın altında hangi kayıttan geldiği görünür; bilgi yoksa uydurmaz.",
+  },
+];
 
 const reasons = [
   {
@@ -91,6 +118,29 @@ const locations = [
   },
 ];
 
+const stats = [
+  {
+    icon: Globe2,
+    title: "Global",
+    text: "Almanya ve Avrupa genelinde uluslararası ihracat ağı.",
+  },
+  {
+    icon: Factory,
+    title: "ÜR-GE",
+    text: "200+ alüminyum profil tasarımı ve sürekli ürün geliştirme.",
+  },
+  {
+    icon: Boxes,
+    title: "Modüler",
+    text: "Yedek parça ve garanti sonrası uzun ömürlü aksesuar desteği.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Kaynaklı",
+    text: "Yanıtlar resmi ürün ve politika kayıtlarına dayanır; yoksa uydurmaz.",
+  },
+];
+
 export default async function HomePage() {
   const supabase = await createClient();
   const {
@@ -98,15 +148,12 @@ export default async function HomePage() {
   } = await supabase.auth.getUser();
 
   return (
-    <main className="app-atmosphere min-h-full flex-1 text-slate-800 selection:bg-indigo-600 selection:text-white">
-      <div className="atmosphere-grid" aria-hidden />
-
-      {/* Floating Navbar */}
-      <header className="fixed top-4 inset-x-0 z-40 mx-auto max-w-5xl px-4">
-        <nav className="animate-fade flex items-center justify-between gap-4 rounded-full border border-slate-200/80 bg-white/80 px-6 py-3.5 backdrop-blur-2xl shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
+    <LandingScroller>
+      <header className="pointer-events-none fixed top-4 inset-x-0 z-40 mx-auto max-w-5xl px-4">
+        <nav className="nav-glass pointer-events-auto flex items-center justify-between gap-4 rounded-full border border-slate-200/80 bg-white/80 px-6 py-3.5 backdrop-blur-2xl shadow-[0_8px_30px_rgba(15,23,42,0.06)]">
           <div className="flex items-center gap-2.5">
-            <span className="flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-600 text-white font-bold text-xs shadow-[0_4px_12px_rgba(79,70,229,0.3)]">
-              Ö
+            <span className="logo-mark flex h-7 w-7 items-center justify-center rounded-xl bg-indigo-600 text-xs font-bold text-white shadow-[0_4px_12px_rgba(79,70,229,0.3)]">
+              O
             </span>
             <div className="font-display text-sm font-semibold tracking-tight text-slate-900">
               ORES <span className="brand-shine font-bold">AI Chatbot</span>
@@ -118,7 +165,7 @@ export default async function HomePage() {
               href="https://ores.com.tr/hakkimizda/"
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-slate-900 transition"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 transition hover:text-slate-900"
             >
               ores.com.tr
               <ArrowRight className="h-3.5 w-3.5" aria-hidden />
@@ -126,7 +173,7 @@ export default async function HomePage() {
             {user ? (
               <Link
                 href="/sohbet"
-                className="btn-indigo inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-semibold"
+                className="btn-indigo animate-cta-pulse inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-semibold"
               >
                 <MessageSquareText className="h-3.5 w-3.5" aria-hidden />
                 Sohbet
@@ -134,7 +181,7 @@ export default async function HomePage() {
             ) : (
               <Link
                 href="/giris"
-                className="btn-indigo inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-semibold"
+                className="btn-indigo animate-cta-pulse inline-flex h-9 items-center gap-1.5 rounded-full px-4 text-xs font-semibold"
               >
                 <LogIn className="h-3.5 w-3.5" aria-hidden />
                 Giriş
@@ -144,39 +191,44 @@ export default async function HomePage() {
         </nav>
       </header>
 
-      {/* Hero Section — Light Mode Bento */}
-      <section className="relative mx-auto flex w-full max-w-5xl flex-col px-6 pb-20 pt-32 sm:pt-40">
-        <div className="flex flex-col items-center text-center">
-          <div className="animate-fade inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50/80 px-4 py-1.5 text-xs font-medium text-indigo-700 backdrop-blur-md shadow-sm">
-            <Award className="h-3.5 w-3.5 text-indigo-600" aria-hidden />
-            <span>1992’den Beri · Akıllı RAG Mağaza Asistanı</span>
+      {/* 1 — Hero */}
+      <section className="landing-panel">
+        <div className="landing-panel-inner mx-auto flex w-full max-w-5xl flex-col items-center justify-center text-center">
+          <div className="animate-fade inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50/80 px-4 py-1.5 text-xs font-medium text-indigo-700 shadow-sm backdrop-blur-md">
+            <Award
+              className="h-3.5 w-3.5 text-indigo-600"
+              aria-hidden
+            />
+            <span> · 1992’den Beri · </span>
           </div>
 
-          <h1 className="animate-rise font-display mt-6 max-w-4xl text-4xl font-bold leading-[1.08] tracking-tight text-slate-900 sm:text-6xl lg:text-7xl">
+          <h1 className="animate-rise font-display mt-5 max-w-4xl text-4xl font-bold leading-[1.08] tracking-tight text-slate-900 sm:text-5xl lg:text-6xl">
             Display ve Tanıtımda
-            <span className="brand-shine mt-2 block">Işık Hızında Yapay Zeka</span>
+            <span className="brand-shine mt-2 block">
+              Işık Hızında Yapay Zeka
+            </span>
           </h1>
 
-          <p className="animate-rise-delay-1 mt-6 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
-            ORES Mağaza ürünleri ve politikaları hakkında sıfır halüsinasyon garantisi ile sorularınızı yanıtlar. Kaynaklı, doğrulanmış ve anlık akıcı sohbet deneyimi.
+          <p className="animate-rise-delay-1 mt-4 max-w-2xl text-base leading-7 text-slate-600 sm:text-lg">
+            ORES Mağaza ürünleri ve politikaları hakkında kaynaklı cevaplar.
           </p>
 
-          <div className="animate-rise-delay-2 mt-10 flex flex-wrap justify-center gap-4">
+          <div className="animate-rise-delay-2 mt-8 flex flex-wrap justify-center gap-4">
             {user ? (
               <>
                 <Link
                   href="/sohbet"
-                  className="btn-indigo inline-flex h-13 items-center gap-2.5 rounded-2xl px-7 text-sm font-semibold shadow-lg"
+                  className="btn-indigo animate-cta-pulse inline-flex h-12 items-center gap-2.5 rounded-2xl px-7 text-sm font-semibold shadow-lg"
                 >
-                  <MessageSquareText className="h-4.5 w-4.5" aria-hidden />
+                  <MessageSquareText className="h-4 w-4" aria-hidden />
                   Sohbete Başla
                 </Link>
                 <form action="/cikis" method="post">
                   <button
                     type="submit"
-                    className="btn-ghost glass-panel inline-flex h-13 items-center gap-2 rounded-2xl px-6 text-sm font-medium text-slate-700 border-slate-200"
+                    className="btn-ghost glass-panel inline-flex h-12 items-center gap-2 rounded-2xl border-slate-200 px-6 text-sm font-medium text-slate-700"
                   >
-                    <LogOut className="h-4.5 w-4.5" aria-hidden />
+                    <LogOut className="h-4 w-4" aria-hidden />
                     Çıkış Yap
                   </button>
                 </form>
@@ -185,199 +237,236 @@ export default async function HomePage() {
               <>
                 <Link
                   href="/giris"
-                  className="btn-indigo inline-flex h-13 items-center gap-2.5 rounded-2xl px-7 text-sm font-semibold shadow-lg"
+                  className="btn-indigo animate-cta-pulse inline-flex h-12 items-center gap-2.5 rounded-2xl px-7 text-sm font-semibold shadow-lg"
                 >
-                  <LogIn className="h-4.5 w-4.5" aria-hidden />
+                  <LogIn className="h-4 w-4" aria-hidden />
                   Giriş Yap ve Dene
                 </Link>
                 <Link
                   href="/kayit"
-                  className="btn-ghost glass-panel inline-flex h-13 items-center gap-2.5 rounded-2xl px-6 text-sm font-medium text-slate-700 border-slate-200"
+                  className="btn-ghost glass-panel inline-flex h-12 items-center gap-2.5 rounded-2xl border-slate-200 px-6 text-sm font-medium text-slate-700"
                 >
-                  <Users className="h-4.5 w-4.5" aria-hidden />
+                  <Users className="h-4 w-4" aria-hidden />
                   Hesap Oluştur
                 </Link>
               </>
             )}
           </div>
-        </div>
-      </section>
 
-      {/* Bento Grid — Biz Kimiz & İstatistikler */}
-      <section className="relative border-t border-slate-200/80 bg-white/60 py-20 backdrop-blur-md">
-        <div className="mx-auto max-w-5xl px-6">
-          <div className="text-center max-w-2xl mx-auto">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
-              Güvenilir Üretim Gücü
+          <div className="animate-rise-delay-3 mt-6 w-full">
+            <p className="mb-2.5 text-[11px] font-semibold uppercase tracking-[0.18em] text-indigo-500">
+              Bizi takip edin
             </p>
-            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-4xl">
-              1992’den Beri Reklam ve Tanıtım Teknolojileri
-            </h2>
+            <SocialLinks reveal={false} />
           </div>
 
-          <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="bento-card p-6">
-              <Globe2 className="h-7 w-7 text-indigo-600" aria-hidden />
-              <p className="font-display mt-4 text-3xl font-bold text-slate-900">Global</p>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                Almanya ve Avrupa genelinde uluslararası ihracat ağı.
-              </p>
-            </div>
-            <div className="bento-card p-6">
-              <Factory className="h-7 w-7 text-indigo-600" aria-hidden />
-              <p className="font-display mt-4 text-3xl font-bold text-slate-900">ÜR-GE</p>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                200+ alüminyum profil tasarımı ve sürekli ürün geliştirme.
-              </p>
-            </div>
-            <div className="bento-card p-6">
-              <Boxes className="h-7 w-7 text-indigo-600" aria-hidden />
-              <p className="font-display mt-4 text-3xl font-bold text-slate-900">Modüler</p>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                Yedek parça ve garanti sonrası uzun ömürlü aksesuar desteği.
-              </p>
-            </div>
-            <div className="bento-card p-6">
-              <ShieldCheck className="h-7 w-7 text-indigo-600" aria-hidden />
-              <p className="font-display mt-4 text-3xl font-bold text-slate-900">%100 Doğruluk</p>
-              <p className="mt-2 text-xs leading-5 text-slate-500">
-                Yalnızca veritabanındaki resmi bilgilere dayalı cevaplar.
-              </p>
-            </div>
+          <div className="animate-rise-delay-3 mt-5 w-full shrink-0 pb-1">
+            <FloatingChips />
           </div>
         </div>
       </section>
 
-      {/* Bento Grid — Neden ORES */}
-      <section className="relative py-20">
-        <div className="mx-auto w-full max-w-5xl px-6">
-          <div className="max-w-2xl">
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+      {/* 2 — Nasıl çalışır */}
+      <section className="landing-panel landing-panel-tint">
+        <div className="landing-panel-inner mx-auto w-full max-w-5xl">
+          <Reveal variant="blur" className="mx-auto max-w-2xl text-center">
+            <p className="section-kicker text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+              Nasıl çalışır?
+            </p>
+            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+              Üç adımda kaynaklı cevap
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-slate-600 sm:text-base">
+              Chatbot yalnızca mağaza kataloğu ve politika metinlerinden yanıt
+              üretir; her cevapta kullanılan kayıtları gösterir.
+            </p>
+          </Reveal>
+
+          <ol className="mt-10 grid gap-5 sm:grid-cols-3">
+            {howItWorks.map((item, i) => (
+              <Reveal key={item.step} delay={i * 120} variant="up">
+                <li className="bento-card bento-card-motion relative overflow-hidden p-6 sm:p-7">
+                  <span className="step-number font-display absolute -right-1 -top-2 text-6xl font-bold text-indigo-600/10">
+                    {item.step}
+                  </span>
+                  <div className="card-icon relative inline-flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 transition">
+                    <item.icon className="h-5 w-5" aria-hidden />
+                  </div>
+                  <h3 className="relative mt-4 text-base font-semibold text-slate-900 sm:text-lg">
+                    {item.title}
+                  </h3>
+                  <p className="relative mt-2 text-sm leading-6 text-slate-600">
+                    {item.text}
+                  </p>
+                </li>
+              </Reveal>
+            ))}
+          </ol>
+        </div>
+      </section>
+
+      {/* 3 — Güvenilir üretim gücü */}
+      <section className="landing-panel">
+        <div className="landing-panel-inner mx-auto w-full max-w-5xl px-6">
+          <Reveal variant="up" className="mx-auto max-w-2xl text-center">
+            <p className="section-kicker text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+              Güvenilir üretim gücü
+            </p>
+            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+              1992’den beri reklam ve tanıtım teknolojileri
+            </h2>
+          </Reveal>
+
+          <div className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
+            {stats.map((item, i) => (
+              <Reveal key={item.title} delay={i * 90} variant="scale">
+                <div className="bento-card bento-card-motion h-full p-6">
+                  <item.icon
+                    className="card-icon h-7 w-7 rounded-lg text-indigo-600"
+                    aria-hidden
+                  />
+                  <p className="stat-value font-display mt-4 text-3xl font-bold">
+                    {item.title}
+                  </p>
+                  <p className="mt-2 text-xs leading-5 text-slate-500 sm:text-sm">
+                    {item.text}
+                  </p>
+                </div>
+              </Reveal>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* 4 — Neden ORES */}
+      <section className="landing-panel landing-panel-tint">
+        <div className="landing-panel-inner mx-auto w-full max-w-5xl px-6">
+          <Reveal variant="left" className="max-w-2xl">
+            <p className="section-kicker text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
               Neden ORES?
             </p>
-            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-slate-900">
-              Görsel İletişimin Olduğu Her Yerdeyiz
+            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+              Görsel iletişimin olduğu her yerdeyiz
             </h2>
-          </div>
+          </Reveal>
           <ul className="mt-10 grid gap-5 sm:grid-cols-2">
             {reasons.map((item, i) => (
-              <li
+              <Reveal
                 key={item.title}
-                className="bento-card p-6"
-                style={{ animationDelay: `${0.05 + i * 0.06}s` }}
+                delay={i * 100}
+                variant={i % 2 === 0 ? "left" : "right"}
               >
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-                  <item.icon className="h-5 w-5" aria-hidden />
-                </div>
-                <h3 className="mt-4 text-base font-semibold text-slate-900">
-                  {item.title}
-                </h3>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                  {item.text}
-                </p>
-              </li>
+                <li className="bento-card bento-card-motion h-full p-6 sm:p-7">
+                  <div className="card-icon inline-flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 transition">
+                    <item.icon className="h-5 w-5" aria-hidden />
+                  </div>
+                  <h3 className="mt-4 text-base font-semibold text-slate-900 sm:text-lg">
+                    {item.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    {item.text}
+                  </p>
+                </li>
+              </Reveal>
             ))}
           </ul>
         </div>
       </section>
 
-      {/* Production Capabilities */}
-      <section className="relative border-y border-slate-200/80 bg-white/70 py-20 text-slate-900 backdrop-blur-xl">
-        <div className="mx-auto w-full max-w-5xl px-6">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
-            Üretim Yeteneklerimiz
-          </p>
-          <h2 className="font-display mt-3 max-w-xl text-3xl font-bold tracking-tight">
-            Tasarımından Sevkiyata Tek Çatı Altında
-          </h2>
+      {/* 5 — Üretim yetenekleri */}
+      <section className="landing-panel">
+        <div className="landing-panel-inner mx-auto w-full max-w-5xl px-6">
+          <Reveal variant="blur">
+            <p className="section-kicker text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+              Üretim yeteneklerimiz
+            </p>
+            <h2 className="font-display mt-3 max-w-xl text-3xl font-bold tracking-tight sm:text-5xl">
+              Tasarımından sevkiyata tek çatı altında
+            </h2>
+          </Reveal>
           <ul className="mt-10 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {capabilities.map((item) => (
-              <li
-                key={item.title}
-                className="bento-card p-6"
-              >
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-                  <item.icon className="h-5 w-5" aria-hidden />
-                </div>
-                <h3 className="mt-4 text-base font-semibold text-slate-900">{item.title}</h3>
-                <p className="mt-2 text-xs leading-6 text-slate-600">
-                  {item.text}
-                </p>
-              </li>
+            {capabilities.map((item, i) => (
+              <Reveal key={item.title} delay={i * 80} variant="up">
+                <li className="bento-card bento-card-motion h-full p-6">
+                  <div className="card-icon inline-flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 transition">
+                    <item.icon className="h-5 w-5" aria-hidden />
+                  </div>
+                  <h3 className="mt-4 text-base font-semibold text-slate-900">
+                    {item.title}
+                  </h3>
+                  <p className="mt-2 text-xs leading-6 text-slate-600 sm:text-sm">
+                    {item.text}
+                  </p>
+                </li>
+              </Reveal>
             ))}
           </ul>
         </div>
       </section>
 
-      {/* Locations */}
-      <section className="relative py-20">
-        <div className="mx-auto w-full max-w-5xl px-6">
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
-            Lokasyonlarımız
-          </p>
-          <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-slate-900">
-            İhtiyacınız Olan Her Yerde Yanınızdayız
-          </h2>
+      {/* 6 — Lokasyonlar + footer sosyal */}
+      <section className="landing-panel landing-panel-tint">
+        <div className="landing-panel-inner mx-auto flex w-full max-w-5xl flex-col justify-center px-6">
+          <Reveal variant="up">
+            <p className="section-kicker text-xs font-bold uppercase tracking-[0.2em] text-indigo-600">
+              Lokasyonlarımız
+            </p>
+            <h2 className="font-display mt-3 text-3xl font-bold tracking-tight text-slate-900 sm:text-5xl">
+              İhtiyacınız olan her yerde yanınızdayız
+            </h2>
+          </Reveal>
           <ul className="mt-10 grid gap-5 md:grid-cols-3">
-            {locations.map((loc) => (
-              <li key={loc.title} className="bento-card p-6">
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100">
-                  <MapPin className="h-5 w-5" aria-hidden />
-                </div>
-                <h3 className="mt-4 text-base font-semibold text-slate-900">
-                  {loc.title}
-                </h3>
-                <p className="mt-2 text-xs leading-6 text-slate-600">
-                  {loc.detail}
-                </p>
-              </li>
+            {locations.map((loc, i) => (
+              <Reveal key={loc.title} delay={i * 110} variant="scale">
+                <li className="bento-card bento-card-motion h-full p-6">
+                  <div className="card-icon inline-flex h-10 w-10 items-center justify-center rounded-xl border border-indigo-100 bg-indigo-50 text-indigo-600 transition">
+                    <MapPin
+                      className="h-5 w-5 animate-bounce-soft"
+                      aria-hidden
+                    />
+                  </div>
+                  <h3 className="mt-4 text-base font-semibold text-slate-900">
+                    {loc.title}
+                  </h3>
+                  <p className="mt-2 text-xs leading-6 text-slate-600 sm:text-sm">
+                    {loc.detail}
+                  </p>
+                </li>
+              </Reveal>
             ))}
           </ul>
+
+          <div className="mt-12 border-t border-slate-200/80 pt-8">
+            <div className="flex flex-col items-center gap-6 sm:flex-row sm:items-center sm:justify-between">
+              <div className="text-center sm:text-left">
+                <p className="font-display text-sm font-bold text-slate-900">
+                  ORES <span className="brand-shine">AI Chatbot</span>
+                </p>
+                <p className="mt-1 text-xs text-slate-500">
+                  <a
+                    href="https://ores.com.tr/hakkimizda/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline transition hover:text-indigo-600"
+                  >
+                    ores.com.tr
+                  </a>
+                  {" · "}
+                  <a
+                    href="https://magaza.ores.com.tr"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline transition hover:text-indigo-600"
+                  >
+                    Mağaza
+                  </a>
+                </p>
+              </div>
+              <SocialLinks reveal={false} />
+            </div>
+          </div>
         </div>
       </section>
-
-      {/* Sleek Footer */}
-      <footer className="relative border-t border-slate-200 bg-white py-12 text-slate-500">
-        <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-6 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <p className="font-display text-sm font-bold text-slate-900">
-              ORES AI Chatbot
-            </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Resmi Site:{" "}
-              <a
-                href="https://ores.com.tr/hakkimizda/"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline hover:text-indigo-600 transition"
-              >
-                ores.com.tr/hakkimizda
-              </a>
-            </p>
-          </div>
-          <div className="flex flex-wrap gap-5 text-xs text-slate-600">
-            <a
-              href="https://magaza.ores.com.tr"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition hover:text-slate-900"
-            >
-              Mağaza
-            </a>
-            <a
-              href="https://ores.com.tr"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="transition hover:text-slate-900"
-            >
-              Kurumsal Site
-            </a>
-            <Link href="/sohbet" className="transition hover:text-indigo-600 font-semibold">
-              Sohbet Uygulaması →
-            </Link>
-          </div>
-        </div>
-      </footer>
-    </main>
+    </LandingScroller>
   );
 }

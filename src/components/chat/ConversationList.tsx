@@ -3,8 +3,6 @@
 import { useMemo, useState } from "react";
 import type { ConversationSummary } from "@/components/chat/types";
 import {
-  Check,
-  CheckSquare,
   CheckSquare2,
   ListChecks,
   MessageSquarePlus,
@@ -106,14 +104,26 @@ export function ConversationList({
 
   const handleConfirmBulkDelete = () => {
     if (!selectedIds.length || !onBulkDelete) return;
+    const ok = window.confirm(
+      `${selectedIds.length} sohbet kalıcı olarak silinecek. Emin misiniz?`,
+    );
+    if (!ok) return;
     onBulkDelete(selectedIds);
     setSelectedIds([]);
     setIsMultiSelect(false);
   };
 
+  const handleDeleteOne = (id: string, title: string | null) => {
+    const label = title?.trim() || "Adsız sohbet";
+    const ok = window.confirm(
+      `"${label}" sohbeti silinecek. Bu işlem geri alınamaz.`,
+    );
+    if (!ok) return;
+    onDelete(id);
+  };
+
   return (
     <div className="flex h-full flex-col">
-      {/* Sidebar Header */}
       <div className="flex flex-col gap-2 border-b border-slate-200 px-4 py-3.5">
         <div className="flex items-center justify-between gap-2">
           <p className="font-display text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -128,6 +138,9 @@ export function ConversationList({
                   setIsMultiSelect(!isMultiSelect);
                   setSelectedIds([]);
                 }}
+                aria-label={
+                  isMultiSelect ? "Seçimi iptal et" : "Çoklu seçim modu"
+                }
                 title={isMultiSelect ? "Seçimi İptal Et" : "Çoklu Seçim Modu"}
                 className={`inline-flex items-center justify-center h-7 px-2 rounded-lg text-xs font-medium transition ${
                   isMultiSelect
@@ -136,9 +149,9 @@ export function ConversationList({
                 }`}
               >
                 {isMultiSelect ? (
-                  <X className="h-3.5 w-3.5" />
+                  <X className="h-3.5 w-3.5" aria-hidden />
                 ) : (
-                  <ListChecks className="h-3.5 w-3.5" />
+                  <ListChecks className="h-3.5 w-3.5" aria-hidden />
                 )}
               </button>
             ) : null}
@@ -156,7 +169,6 @@ export function ConversationList({
           </div>
         </div>
 
-        {/* Multi Select Bulk Actions Bar */}
         {isMultiSelect ? (
           <div className="flex items-center justify-between gap-2 pt-1">
             <button
@@ -174,14 +186,13 @@ export function ConversationList({
               onClick={handleConfirmBulkDelete}
               className="inline-flex items-center gap-1.5 rounded-xl bg-red-600 px-3 py-1 text-xs font-semibold text-white shadow-sm disabled:opacity-40 hover:bg-red-700 transition"
             >
-              <Trash2 className="h-3 w-3" />
+              <Trash2 className="h-3 w-3" aria-hidden />
               Seçilenleri Sil ({selectedIds.length})
             </button>
           </div>
         ) : null}
       </div>
 
-      {/* Grouped Conversations List */}
       <div className="flex-1 space-y-4 overflow-y-auto p-2.5">
         {conversations.length === 0 ? (
           <div className="px-3 py-8 text-xs text-slate-400 text-center">
@@ -213,12 +224,15 @@ export function ConversationList({
                         <button
                           type="button"
                           onClick={() => toggleSelect(conversation.id)}
+                          aria-label={
+                            isChecked ? "Seçimi kaldır" : "Sohbeti seç"
+                          }
                           className="p-2 text-indigo-600 hover:opacity-80 transition"
                         >
                           {isChecked ? (
-                            <CheckSquare2 className="h-4 w-4 fill-indigo-600 text-white" />
+                            <CheckSquare2 className="h-4 w-4 fill-indigo-600 text-white" aria-hidden />
                           ) : (
-                            <Square className="h-4 w-4 text-slate-400" />
+                            <Square className="h-4 w-4 text-slate-400" aria-hidden />
                           )}
                         </button>
                       ) : null}
@@ -246,8 +260,13 @@ export function ConversationList({
                       {!isMultiSelect ? (
                         <button
                           type="button"
-                          onClick={() => onDelete(conversation.id)}
-                          className="rounded-xl p-2 text-slate-400 opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100"
+                          onClick={() =>
+                            handleDeleteOne(
+                              conversation.id,
+                              conversation.title,
+                            )
+                          }
+                          className="rounded-xl p-2 text-slate-400 opacity-100 transition hover:bg-red-50 hover:text-red-600 md:opacity-0 md:group-hover:opacity-100 md:focus-visible:opacity-100"
                           aria-label="Sohbeti sil"
                         >
                           <Trash2 className="h-3.5 w-3.5" aria-hidden />

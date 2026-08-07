@@ -14,7 +14,7 @@ export function SourceList({ sources }: { sources: ChatSource[] }) {
           const isProduct = source.source_type === "urun";
           const label = `${isProduct ? "Ürün" : "Politika"}: ${source.source_title}`;
           const className =
-            "inline-flex max-w-full items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50/80 px-3 py-1 text-xs text-indigo-700 backdrop-blur-md";
+            "group inline-flex max-w-full items-center gap-1.5 rounded-full border border-indigo-100 bg-indigo-50/80 px-3 py-1 text-xs text-indigo-700 backdrop-blur-md";
 
           const Icon = isProduct ? Package : FileText;
 
@@ -28,9 +28,15 @@ export function SourceList({ sources }: { sources: ChatSource[] }) {
                   className={`${className} transition hover:border-indigo-300 hover:bg-indigo-600 hover:text-white shadow-sm`}
                   title={label}
                 >
-                  <Icon className="h-3 w-3 shrink-0 text-indigo-600 group-hover:text-white" aria-hidden />
+                  <Icon
+                    className="h-3 w-3 shrink-0 text-indigo-600 group-hover:text-white"
+                    aria-hidden
+                  />
                   <span className="truncate">{label}</span>
-                  <ExternalLink className="h-3 w-3 shrink-0 opacity-70" aria-hidden />
+                  <ExternalLink
+                    className="h-3 w-3 shrink-0 opacity-70 group-hover:text-white"
+                    aria-hidden
+                  />
                 </a>
               </li>
             );

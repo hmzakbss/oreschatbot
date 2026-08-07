@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Bot,
+  ChevronDown,
   CircleHelp,
   Package,
   Shield,
@@ -31,6 +32,16 @@ const SUGGESTIONS = [
   },
 ];
 
+function formatMessageTime(iso?: string): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString("tr-TR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export function MessageList({
   messages,
   loading,
@@ -44,17 +55,31 @@ export function MessageList({
 }) {
   const containerRef = useRef<HTMLDivElement>(null);
   const isUserScrolledUp = useRef(false);
+  const [showJumpDown, setShowJumpDown] = useState(false);
 
   const handleScroll = () => {
     if (!containerRef.current) return;
     const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
     const distanceFromBottom = scrollHeight - scrollTop - clientHeight;
-    isUserScrolledUp.current = distanceFromBottom > 120;
+    const scrolledUp = distanceFromBottom > 120;
+    isUserScrolledUp.current = scrolledUp;
+    setShowJumpDown(scrolledUp);
+  };
+
+  const scrollToBottom = () => {
+    if (!containerRef.current) return;
+    containerRef.current.scrollTo({
+      top: containerRef.current.scrollHeight,
+      behavior: "smooth",
+    });
+    isUserScrolledUp.current = false;
+    setShowJumpDown(false);
   };
 
   useEffect(() => {
     if (messages.length <= 1) {
       isUserScrolledUp.current = false;
+      setShowJumpDown(false);
     }
   }, [messages.length]);
 
@@ -93,7 +118,8 @@ export function MessageList({
             Ne Öğrenmek İstersin?
           </p>
           <p className="animate-rise-delay-2 mt-3 text-sm leading-6 text-slate-600">
-            Ürün teknik özellikleri veya mağaza politikaları hakkında soru sorabilirsin.
+            Ürün teknik özellikleri veya mağaza politikaları hakkında soru
+            sorabilirsin.
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-2.5">
             {SUGGESTIONS.map((q, i) => (
@@ -119,71 +145,97 @@ export function MessageList({
   }
 
   return (
-    <div
-      ref={containerRef}
-      onScroll={handleScroll}
-      className="flex-1 space-y-5 overflow-y-auto px-4 py-6 sm:px-6 scroll-smooth"
-    >
-      {messages.map((message, idx) => {
-        const isUser = message.role === "user";
-        const isLastAssistant =
-          !isUser && loading && idx === messages.length - 1;
+    <div className="relative flex min-h-0 flex-1 flex-col">
+      <div
+        ref={containerRef}
+        onScroll={handleScroll}
+        className="flex-1 space-y-5 overflow-y-auto px-4 py-6 sm:px-6 scroll-smooth"
+      >
+        {messages.map((message, idx) => {
+          const isUser = message.role === "user";
+          const isLastAssistant =
+            !isUser && loading && idx === messages.length - 1;
+          const timeLabel = formatMessageTime(message.created_at);
 
-        return (
-          <div
-            key={message.id}
-            className={`msg-enter flex ${isUser ? "justify-end" : "justify-start"}`}
-          >
+          return (
             <div
-              className={`flex max-w-[85%] sm:max-w-[78%] gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
+              key={message.id}
+              className={`msg-enter flex ${isUser ? "justify-end" : "justify-start"}`}
             >
-              {!isUser ? (
-                <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
-                  <Bot className="h-4.5 w-4.5" aria-hidden />
-                </span>
-              ) : null}
               <div
-                className={`rounded-3xl px-5 py-3.5 text-sm leading-6 transition-all ${
-                  isUser
-                    ? "btn-indigo text-white font-medium shadow-[0_6px_20px_rgba(79,70,229,0.25)]"
-                    : "glass-panel border-slate-200/80 bg-white/90 text-slate-800 shadow-sm"
-                }`}
+                className={`flex max-w-[85%] sm:max-w-[78%] gap-3 ${isUser ? "flex-row-reverse" : "flex-row"}`}
               >
-                <div className="whitespace-pre-wrap">
-                  {message.content}
-                  {isLastAssistant ? (
-                    <span className="streaming-cursor" aria-hidden />
+                {!isUser ? (
+                  <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
+                    <Bot className="h-4 w-4" aria-hidden />
+                  </span>
+                ) : null}
+                <div
+                  className={`rounded-3xl px-5 py-3.5 text-sm leading-6 transition-all ${
+                    isUser
+                      ? "btn-indigo text-white font-medium shadow-[0_6px_20px_rgba(79,70,229,0.25)]"
+                      : "glass-panel border-slate-200/80 bg-white/90 text-slate-800 shadow-sm"
+                  }`}
+                >
+                  <div className="whitespace-pre-wrap">
+                    {message.content}
+                    {isLastAssistant ? (
+                      <span className="streaming-cursor" aria-hidden />
+                    ) : null}
+                  </div>
+                  {!isUser ? (
+                    <SourceList sources={message.sources ?? []} />
+                  ) : null}
+                  {timeLabel ? (
+                    <p
+                      className={`mt-2 text-[10px] font-medium ${
+                        isUser ? "text-white/70 text-right" : "text-slate-400"
+                      }`}
+                    >
+                      {timeLabel}
+                    </p>
                   ) : null}
                 </div>
-                {!isUser ? (
-                  <SourceList sources={message.sources ?? []} />
-                ) : null}
+              </div>
+            </div>
+          );
+        })}
+
+        {loading &&
+        (!messages.length ||
+          messages[messages.length - 1]?.role === "user") ? (
+          <div className="msg-enter flex justify-start">
+            <div className="flex gap-3">
+              <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
+                <Bot className="h-4 w-4" aria-hidden />
+              </span>
+              <div className="glass-panel border-slate-200/80 bg-white/90 rounded-3xl px-5 py-3.5 text-xs text-slate-600">
+                <span className="inline-flex items-center gap-2.5 font-medium">
+                  <span className="inline-flex gap-1.5">
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                    <span className="typing-dot" />
+                  </span>
+                  {loadingMessages
+                    ? "Sohbet yükleniyor…"
+                    : "ORES AI yanıt hazırlıyor…"}
+                </span>
               </div>
             </div>
           </div>
-        );
-      })}
+        ) : null}
+      </div>
 
-      {loading &&
-      (!messages.length ||
-        messages[messages.length - 1]?.role === "user") ? (
-        <div className="msg-enter flex justify-start">
-          <div className="flex gap-3">
-            <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-indigo-600 text-white shadow-sm">
-              <Bot className="h-4.5 w-4.5" aria-hidden />
-            </span>
-            <div className="glass-panel border-slate-200/80 bg-white/90 rounded-3xl px-5 py-3.5 text-xs text-slate-600">
-              <span className="inline-flex items-center gap-2.5 font-medium">
-                <span className="inline-flex gap-1.5">
-                  <span className="typing-dot" />
-                  <span className="typing-dot" />
-                  <span className="typing-dot" />
-                </span>
-                {loadingMessages ? "Sohbet yükleniyor…" : "ORES AI yanıt hazırlıyor…"}
-              </span>
-            </div>
-          </div>
-        </div>
+      {showJumpDown ? (
+        <button
+          type="button"
+          onClick={scrollToBottom}
+          className="absolute bottom-4 left-1/2 z-10 inline-flex -translate-x-1/2 items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 shadow-md transition hover:border-indigo-200 hover:text-indigo-700"
+          aria-label="En alta in"
+        >
+          <ChevronDown className="h-3.5 w-3.5" aria-hidden />
+          Yeni mesajlar
+        </button>
       ) : null}
     </div>
   );

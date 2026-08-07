@@ -57,8 +57,8 @@ Tarayıcı: http://localhost:3000
 
 ## Bilinen eksikler / sonraki adımlar
 
-- Streaming yanıt, fiyat/kategori filtre UI, otomatik eval testi (bonus)
-- Sohbet UI iyileştirmeleri
+- Ayrı fiyat/kategori filtre UI (bonus; filtreleme sohbet + tool calling ile çalışır)
+- Demo kullanıcı bilgisi (aşağıya eklenecek)
 
 ## Çalışma günlüğü
 
